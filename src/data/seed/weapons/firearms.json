@@ -1,0 +1,17 @@
+[
+  {
+    "id": "handgonne",
+    "name": "Handgonne",
+    "description": "DLC: Blazing Deserts",
+    "type": "RANGED",
+    "category": "FIREARMS",
+    "baseDamage": [35, 75],
+    "weight": [2.5, 3.0],
+    "price": 3000,
+    "material": "Stahl",
+    "durability": 60,
+    "properties": [],
+    "imageUrl": "",
+    "grasp": ["TWO_HANDED"]
+  }
+]

@@ -7,7 +7,10 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "stop": "brew services stop postgresql@15"
+    "stop": "brew services stop postgresql@15",
+    "migrate": "node scripts/migrate.js",
+    "seed-weapons": "node scripts/seed-weapons.js",
+    "reset-weapons": "npm run migrate && npm run seed-weapons"
   },
   "dependencies": {
     "@hookform/resolvers": "^4.1.2",

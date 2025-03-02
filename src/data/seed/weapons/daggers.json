@@ -1,0 +1,62 @@
+[
+    {
+      "id": "knife",
+      "name": "Knife",
+      "description": "",
+      "type": "MELEE",
+      "category": "DAGGER",
+      "baseDamage": [15,25],
+      "weight": [0.1,0.2],
+      "price": 30,
+      "material": "Stahl",
+      "durability": 32,
+      "properties": [],
+      "imageUrl": "",
+      "grasp": ["ONE_HANDED"]
+    },
+    {
+      "id": "dagger",
+      "name": "Dolch",
+      "description": "Ein kleiner Dolch, der für schnelle Angriffe und Täuschungsmanöver geeignet ist.",
+      "type": "MELEE",
+      "category": "DAGGER",
+      "baseDamage": [15,35],
+      "weight": [0.2,0.3],
+      "price": 180,
+      "material": "Stahl",
+      "durability": 40,
+      "properties": [],
+      "imageUrl": "",
+      "grasp": ["ONE_HANDED"]
+    },
+    {
+      "id": "notched_blade",
+      "name": "Notched Blade",
+      "description": "A long curved knife with a one sided blade used for slashing, hacking and stabbing at weak spots.",
+      "type": "MELEE",
+      "category": "DAGGER",
+      "baseDamage": [20,30],
+      "weight": [0.25,0.3],
+      "price": 350,
+      "material": "Stahl",
+      "durability": 50,
+      "properties": [],
+      "imageUrl": "",
+      "grasp": ["ONE_HANDED"]
+    },
+    {
+      "id": "rondel_dagger",
+      "name": "Rondel Dagger",
+      "description": "A long, straight, stiff blade with a triangular cross-section and a needle-like point, primarily designed for thrusting.",
+      "type": "MELEE",
+      "category": "DAGGER",
+      "baseDamage": [20,40],
+      "weight": [0.3,0.4],
+      "price": 400,
+      "material": "Stahl",
+      "durability": 60,
+      "properties": [],
+      "imageUrl": "",
+      "grasp": ["ONE_HANDED"]
+    }
+  ]
