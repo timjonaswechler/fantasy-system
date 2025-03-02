@@ -1,5 +1,5 @@
 // src/app/users/page.tsx
-import { getUsers, createUser } from "@/actions/users";
+import { getUsers } from "@/actions/users";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -20,6 +20,11 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
+// Server Actions in separaten Funktionen
+import { createUser, deleteUser } from "@/actions/users";
+
+// Kein "handleCreateUser" mehr notwendig, da createUser bereits ein Server Action ist
+
 export default async function UsersPage() {
   // Daten von Server Action laden
   const users = await getUsers();
@@ -36,11 +41,7 @@ export default async function UsersPage() {
             Füge einen neuen Benutzer zur Datenbank hinzu
           </CardDescription>
         </CardHeader>
-        <form
-          action={async (formData: FormData) => {
-            await createUser(formData);
-          }}
-        >
+        <form action={createUser}>
           <CardContent className="space-y-4">
             <div>
               <label
@@ -117,16 +118,15 @@ export default async function UsersPage() {
                         <Button variant="outline" size="sm" asChild>
                           <a href={`/users/${user.id}`}>Bearbeiten</a>
                         </Button>
-                        <form
-                          action={async () => {
-                            "use server";
-                            const { deleteUser } = await import(
-                              "@/actions/users"
-                            );
-                            await deleteUser(user.id);
-                          }}
-                        >
-                          <Button variant="destructive" size="sm" type="submit">
+                        <form>
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            formAction={async () => {
+                              "use server";
+                              await deleteUser(user.id);
+                            }}
+                          >
                             Löschen
                           </Button>
                         </form>
