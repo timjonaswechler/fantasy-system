@@ -1,37 +1,42 @@
 "use client";
 
-import type { Task } from "@/db/schema";
+import { IWeapon } from "@/types/weapon";
 import type { Table } from "@tanstack/react-table";
-import { Download } from "lucide-react";
+import { Download, Plus, FileUp } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import { exportTableToCSV } from "@/lib/export";
 
-import { DeleteTasksDialog } from "./delete-tasks-dialog";
+import { DeleteWeaponDialog } from "./delete-weapons-dialog";
 
-interface TasksTableToolbarActionsProps {
-  table: Table<Task>;
+interface WeaponsTableToolbarActionsProps {
+  table: Table<IWeapon>;
 }
 
-export function TasksTableToolbarActions({
+export function WeaponsTableToolbarActions({
   table,
-}: TasksTableToolbarActionsProps) {
+}: WeaponsTableToolbarActionsProps) {
+  const router = useRouter();
+
   return (
     <div className="flex items-center gap-2">
       {table.getFilteredSelectedRowModel().rows.length > 0 ? (
-        <DeleteTasksDialog
-          tasks={table
+        <DeleteWeaponDialog
+          id="batch-delete-weapons-trigger"
+          weapons={table
             .getFilteredSelectedRowModel()
             .rows.map((row) => row.original)}
           onSuccess={() => table.toggleAllRowsSelected(false)}
         />
       ) : null}
+
       <Button
         variant="outline"
         size="sm"
         onClick={() =>
           exportTableToCSV(table, {
-            filename: "tasks",
+            filename: "waffenliste",
             excludeColumns: ["select", "actions"],
           })
         }
@@ -40,10 +45,16 @@ export function TasksTableToolbarActions({
         <Download className="size-4" aria-hidden="true" />
         Export
       </Button>
-      {/**
-       * Other actions can be added here.
-       * For example, import, view, etc.
-       */}
+
+      <Button
+        variant="default"
+        size="sm"
+        className="gap-2"
+        onClick={() => router.push("/weapons/new")}
+      >
+        <Plus className="size-4" aria-hidden="true" />
+        Neue Waffe
+      </Button>
     </div>
   );
 }
