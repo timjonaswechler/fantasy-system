@@ -3,10 +3,11 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --turbopack",
+    "dev": "brew services start postgresql@15 && next dev --turbopack ",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "stop": "brew services stop postgresql@15"
   },
   "dependencies": {
     "@hookform/resolvers": "^4.1.2",
