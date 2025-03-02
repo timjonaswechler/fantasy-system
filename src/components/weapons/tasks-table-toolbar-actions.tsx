@@ -1,42 +1,37 @@
 "use client";
 
-import { IWeapon } from "@/types/weapon";
+import type { Task } from "@/db/schema";
 import type { Table } from "@tanstack/react-table";
-import { Download, Plus, FileUp } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { Download } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { exportTableToCSV } from "@/lib/export";
 
-import { DeleteWeaponDialog } from "./delete-weapons-dialog";
+import { DeleteTasksDialog } from "./delete-tasks-dialog";
 
-interface WeaponsTableToolbarActionsProps {
-  table: Table<IWeapon>;
+interface TasksTableToolbarActionsProps {
+  table: Table<Task>;
 }
 
-export function WeaponsTableToolbarActions({
+export function TasksTableToolbarActions({
   table,
-}: WeaponsTableToolbarActionsProps) {
-  const router = useRouter();
-
+}: TasksTableToolbarActionsProps) {
   return (
     <div className="flex items-center gap-2">
       {table.getFilteredSelectedRowModel().rows.length > 0 ? (
-        <DeleteWeaponDialog
-          id="batch-delete-weapons-trigger"
-          weapons={table
+        <DeleteTasksDialog
+          tasks={table
             .getFilteredSelectedRowModel()
             .rows.map((row) => row.original)}
           onSuccess={() => table.toggleAllRowsSelected(false)}
         />
       ) : null}
-
       <Button
         variant="outline"
         size="sm"
         onClick={() =>
           exportTableToCSV(table, {
-            filename: "waffenliste",
+            filename: "tasks",
             excludeColumns: ["select", "actions"],
           })
         }
@@ -45,16 +40,10 @@ export function WeaponsTableToolbarActions({
         <Download className="size-4" aria-hidden="true" />
         Export
       </Button>
-
-      <Button
-        variant="default"
-        size="sm"
-        className="gap-2"
-        onClick={() => router.push("/weapons/new")}
-      >
-        <Plus className="size-4" aria-hidden="true" />
-        Neue Waffe
-      </Button>
+      {/**
+       * Other actions can be added here.
+       * For example, import, view, etc.
+       */}
     </div>
   );
 }
