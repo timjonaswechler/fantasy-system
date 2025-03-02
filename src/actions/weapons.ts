@@ -69,13 +69,17 @@ export async function getWeapons(): Promise<IWeapon[]> {
     const weaponIds = weapons.map((w) => w.id);
     const grasp = await query<any>(
       `
-      SELECT wg.weapon_id, wg.grasp_type
+      SELECT wg.weapon_id, wg.grasp_type, w.weapon_id as external_id
       FROM weapon_grasp wg
       JOIN weapons w ON w.id = wg.weapon_id
       WHERE w.weapon_id = ANY($1)
-    `,
+      `,
       [weaponIds]
     );
+
+    if (grasp.length === 0) {
+      console.log("No grasp data found for weapons:", weaponIds);
+    }
 
     // Get range data for each weapon
     const rangeData = await query<any>(
@@ -92,15 +96,10 @@ export async function getWeapons(): Promise<IWeapon[]> {
     return weapons.map((weapon) => {
       // Convert the range data to a Map
       const rangeMap = new Map<number, number>();
-      rangeData
-        .filter((r) => r.weapon_id === weapon.id)
-        .forEach((r) => {
-          rangeMap.set(r.precision_value, r.distance);
-        });
-
-      // Convert the grasp data to an array of GraspType
+      rangeData.filter((r) => r.weapon_id === weapon.id);
+      // Dann beim Mapping:
       const graspArray = grasp
-        .filter((g) => g.weapon_id === weapon.id)
+        .filter((g) => g.external_id === weapon.id)
         .map((g) => g.grasp_type);
 
       return {

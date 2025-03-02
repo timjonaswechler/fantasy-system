@@ -32,14 +32,17 @@ import { toast } from "sonner";
 import dynamic from "next/dynamic";
 
 // Dynamically import the RangeChart component
-const RangeChart = dynamic(() => import("@/components/weapons/range-chart"), {
-  ssr: false,
-  loading: () => (
-    <div className="h-48 flex items-center justify-center bg-muted rounded-md">
-      Lade Reichweitenchart...
-    </div>
-  ),
-});
+const RangeChart = dynamic(
+  () => import("@/components/weapons/weapon-detail/range-chart"),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="h-48 flex items-center justify-center bg-muted rounded-md">
+        Lade Reichweitenchart...
+      </div>
+    ),
+  }
+);
 
 interface WeaponDetailProps {
   weapon: IWeapon;
