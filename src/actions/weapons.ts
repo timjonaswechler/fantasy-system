@@ -483,6 +483,28 @@ export async function getWeaponsByCategory(
     throw new Error("Failed to fetch weapons by category");
   }
 }
+export async function getWeaponByGrasp(grasp: GraspType): Promise<IWeapon[]> {
+  try {
+    const weaponsOfGrasp = await query<any>(
+      `
+      SELECT 
+        weapon_id as id 
+      FROM weapon_grasp 
+      WHERE grasp_type = $1
+    `,
+      [grasp]
+    );
+
+    const weaponIds = weaponsOfGrasp.map((w) => w.id);
+
+    // Use the existing getWeapons function and filter
+    const allWeapons = await getWeapons();
+    return allWeapons.filter((weapon) => weaponIds.includes(weapon.id));
+  } catch (error) {
+    console.error(`Error fetching weapons of grasp ${grasp}:`, error);
+    throw new Error("Failed to fetch weapons by grasp");
+  }
+}
 
 // Seed weapons data - for initial setup or development
 export async function seedWeaponsData(weapons: WeaponFormData[]) {
