@@ -68,6 +68,7 @@ export function getColumns({
       ),
       enableSorting: false,
       enableHiding: false,
+      size: 19,
     },
     {
       accessorKey: "name",

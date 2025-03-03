@@ -140,7 +140,7 @@ export function WeaponsTable({ weapons }: WeaponsTableProps) {
 
         // Handle grasp array filtering
         if (columnId === "grasp") {
-          return row.original.grasp.some((graspType) =>
+          return row.original.grasp.some((graspType: GraspType) =>
             value.includes(graspType)
           );
         }
