@@ -53,7 +53,11 @@ export function WeaponsTableToolbarActions({
         </Button>
       )}
 
-      <ImportWeaponsDialog onSuccess={onCreateWeapon} />
+      <ImportWeaponsDialog
+        onSuccess={() => {
+          window.location.reload();
+        }}
+      />
 
       <Button size="sm" className="gap-2" onClick={onCreateWeapon}>
         <Plus className="size-4" aria-hidden="true" />
