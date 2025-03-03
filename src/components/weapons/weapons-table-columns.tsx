@@ -3,9 +3,8 @@
 import { IWeapon } from "@/actions/weapons";
 import type { DataTableRowAction } from "@/types";
 import type { ColumnDef } from "@tanstack/react-table";
-import { Ellipsis, Sword, Target, Hand } from "lucide-react";
+import { Ellipsis, Sword, Target, Hand, Eye, Edit, Trash } from "lucide-react";
 import * as React from "react";
-import { toast } from "sonner";
 
 import { DataTableColumnHeader } from "@/components/data-table/data-table-column-header";
 import { Badge } from "@/components/ui/badge";
@@ -16,7 +15,6 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
-  DropdownMenuShortcut,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { WeaponType, GraspType } from "@/types/weapon";
@@ -25,6 +23,7 @@ interface GetColumnsProps {
   setRowAction: React.Dispatch<
     React.SetStateAction<DataTableRowAction<IWeapon> | null>
   >;
+  onViewWeapon?: (weapon: IWeapon) => void;
 }
 
 // Function to get weapon type icon
@@ -43,6 +42,7 @@ const getWeaponTypeIcon = (type: WeaponType) => {
 
 export function getColumns({
   setRowAction,
+  onViewWeapon,
 }: GetColumnsProps): ColumnDef<IWeapon>[] {
   return [
     {
@@ -153,7 +153,7 @@ export function getColumns({
         const price = row.original.price;
         return (
           <div className="flex items-center">
-            <span>{price} GP</span>
+            <span>{price} Gold</span>
           </div>
         );
       },
@@ -182,72 +182,46 @@ export function getColumns({
         const graspTypes = row.original.grasp;
         return value.some((v) => graspTypes.includes(v as GraspType));
       },
-    },
-    {
-      accessorKey: "material",
-      header: ({ column }) => (
-        <DataTableColumnHeader column={column} title="Material" />
-      ),
-      cell: ({ row }) => {
-        return (
-          <div className="flex items-center">
-            <span>{row.original.material}</span>
-          </div>
-        );
-      },
-    },
-    {
-      accessorKey: "durability",
-      header: ({ column }) => (
-        <DataTableColumnHeader column={column} title="Durability" />
-      ),
-      cell: ({ row }) => {
-        return (
-          <div className="flex items-center">
-            <span>{row.original.durability}</span>
-          </div>
-        );
-      },
+      size: 30,
     },
     {
       id: "actions",
       cell: function Cell({ row }) {
         return (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                aria-label="Open menu"
-                variant="ghost"
-                className="flex size-8 p-0 data-[state=open]:bg-muted"
-              >
-                <Ellipsis className="size-4" aria-hidden="true" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-40">
-              <DropdownMenuItem
-                onSelect={() => setRowAction({ row, type: "update" })}
-              >
-                Edit
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onSelect={() => {
-                  window.location.href = `/weapons/${row.original.id}`;
-                }}
-              >
-                View Details
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                onSelect={() => setRowAction({ row, type: "delete" })}
-              >
-                Delete
-                <DropdownMenuShortcut>⌘⌫</DropdownMenuShortcut>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <div>
+            {/* Dropdown menu for additional actions if needed */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  aria-label="More options"
+                  variant="ghost"
+                  className="flex size-8 p-0 data-[state=open]:bg-muted"
+                >
+                  <Ellipsis className="size-4" aria-hidden="true" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-40">
+                <DropdownMenuItem onClick={() => onViewWeapon?.(row.original)}>
+                  View Details
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => setRowAction({ row, type: "update" })}
+                >
+                  Edit
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={() => setRowAction({ row, type: "delete" })}
+                  className="text-destructive"
+                >
+                  Delete
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         );
       },
-      size: 40,
+      size: 17,
     },
   ];
 }

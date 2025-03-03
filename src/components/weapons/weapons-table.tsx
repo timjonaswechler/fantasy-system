@@ -19,11 +19,13 @@ import {
 } from "@tanstack/react-table";
 import { toSentenceCase } from "@/lib/utils";
 
-import { DeleteWeaponsDialog } from "./delete-weapons-dialog";
 import { getColumns } from "./weapons-table-columns";
 import { WeaponsTableToolbarActions } from "./weapons-table-toolbar-actions";
-import { UpdateWeaponSheet } from "./update-weapon-sheet";
-import { WeaponCategory, WeaponType, GraspType } from "@/types/weapon";
+import { DeleteWeaponsDialog } from "./delete-weapons-dialog";
+import { WeaponUpdateSheet } from "./weapon-update-sheet";
+import { WeaponDetailSheet } from "./weapon-detail-sheet";
+import { WeaponCreateSheet } from "./weapon-create-sheet";
+import { WeaponType, WeaponCategory, GraspType } from "@/types/weapon";
 
 interface WeaponsTableProps {
   weapons: IWeapon[];
@@ -32,8 +34,48 @@ interface WeaponsTableProps {
 export function WeaponsTable({ weapons }: WeaponsTableProps) {
   const [rowAction, setRowAction] =
     React.useState<DataTableRowAction<IWeapon> | null>(null);
+  const [isDetailSheetOpen, setIsDetailSheetOpen] = React.useState(false);
+  const [isCreateSheetOpen, setIsCreateSheetOpen] = React.useState(false);
+  const [selectedWeapon, setSelectedWeapon] = React.useState<IWeapon | null>(
+    null
+  );
 
-  const columns = React.useMemo(() => getColumns({ setRowAction }), []);
+  // Function to handle viewing a weapon's details
+  const handleViewWeapon = (weapon: IWeapon) => {
+    setSelectedWeapon(weapon);
+    setIsDetailSheetOpen(true);
+  };
+
+  // Function to handle editing a weapon
+  const handleEditWeapon = (weapon: IWeapon) => {
+    setRowAction({ row: { original: weapon } as any, type: "update" });
+  };
+
+  // Function to handle deleting a weapon
+  const handleDeleteWeapon = (weapon: IWeapon) => {
+    setRowAction({ row: { original: weapon } as any, type: "delete" });
+  };
+
+  // Function to handle creating a new weapon
+  const handleCreateWeapon = () => {
+    setIsCreateSheetOpen(true);
+  };
+
+  // Function to handle refreshing the weapons list (after changes)
+  const handleRefresh = () => {
+    // In a real app, you might want to refetch data from the server
+    // For now, we'll just log that we would refresh
+    console.log("Refreshing weapons list");
+  };
+
+  // Custom columns with a view action added
+  const customColumns = React.useMemo(() => {
+    const cols = getColumns({
+      setRowAction,
+      onViewWeapon: handleViewWeapon,
+    });
+    return cols;
+  }, []);
 
   // Calculate type, category, and grasp counts for filters
   const typeCounts = React.useMemo(() => {
@@ -116,7 +158,7 @@ export function WeaponsTable({ weapons }: WeaponsTableProps) {
   // Create table
   const table = useReactTable({
     data: weapons,
-    columns,
+    columns: customColumns,
     getCoreRowModel: getCoreRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
     getSortedRowModel: getSortedRowModel(),
@@ -163,15 +205,49 @@ export function WeaponsTable({ weapons }: WeaponsTableProps) {
     <>
       <DataTable table={table}>
         <DataTableToolbar table={table} filterFields={filterFields}>
-          <WeaponsTableToolbarActions table={table} />
+          <WeaponsTableToolbarActions
+            table={table}
+            onCreateWeapon={handleCreateWeapon}
+          />
         </DataTableToolbar>
       </DataTable>
 
-      {/* Update dialog */}
-      <UpdateWeaponSheet
+      {/* Weapon Detail Sheet */}
+      <WeaponDetailSheet
+        weapon={selectedWeapon}
+        open={isDetailSheetOpen}
+        onOpenChange={setIsDetailSheetOpen}
+        onEdit={() => {
+          setIsDetailSheetOpen(false);
+          if (selectedWeapon) {
+            handleEditWeapon(selectedWeapon);
+          }
+        }}
+        onDelete={() => {
+          setIsDetailSheetOpen(false);
+          if (selectedWeapon) {
+            handleDeleteWeapon(selectedWeapon);
+          }
+        }}
+      />
+
+      {/* Update Sheet */}
+      <WeaponUpdateSheet
         open={rowAction?.type === "update"}
-        onOpenChange={() => setRowAction(null)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setRowAction(null);
+            handleRefresh(); // Call refresh when Sheet closes instead
+          }
+        }}
         weapon={rowAction?.row.original ?? null}
+      />
+
+      {/* Create weapon Sheet */}
+      <WeaponCreateSheet
+        open={isCreateSheetOpen}
+        onOpenChange={setIsCreateSheetOpen}
+        onSuccess={handleRefresh}
       />
 
       {/* Delete dialog */}
@@ -180,7 +256,12 @@ export function WeaponsTable({ weapons }: WeaponsTableProps) {
         onOpenChange={() => setRowAction(null)}
         weapons={rowAction?.row.original ? [rowAction?.row.original] : []}
         showTrigger={false}
-        onSuccess={() => rowAction?.row.toggleSelected(false)}
+        onSuccess={() => {
+          if (rowAction?.row.toggleSelected) {
+            rowAction?.row.toggleSelected(false);
+          }
+          handleRefresh();
+        }}
       />
     </>
   );
