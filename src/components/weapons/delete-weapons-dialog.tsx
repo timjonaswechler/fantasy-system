@@ -1,6 +1,6 @@
 "use client";
 
-import type { Task } from "@/db/schema";
+import { IWeapon, deleteWeapon } from "@/actions/weapons";
 import type { Row } from "@tanstack/react-table";
 import { Loader, Trash } from "lucide-react";
 import * as React from "react";
@@ -29,38 +29,37 @@ import {
 } from "@/components/ui/drawer";
 import { useMediaQuery } from "@/hooks/use-media-query";
 
-import { deleteTasks } from "../_lib/actions";
-
-interface DeleteTasksDialogProps
+interface DeleteWeaponsDialogProps
   extends React.ComponentPropsWithoutRef<typeof Dialog> {
-  tasks: Row<Task>["original"][];
+  weapons: IWeapon[];
   showTrigger?: boolean;
   onSuccess?: () => void;
 }
 
-export function DeleteTasksDialog({
-  tasks,
+export function DeleteWeaponsDialog({
+  weapons,
   showTrigger = true,
   onSuccess,
   ...props
-}: DeleteTasksDialogProps) {
+}: DeleteWeaponsDialogProps) {
   const [isDeletePending, startDeleteTransition] = React.useTransition();
   const isDesktop = useMediaQuery("(min-width: 640px)");
 
   function onDelete() {
     startDeleteTransition(async () => {
-      const { error } = await deleteTasks({
-        ids: tasks.map((task) => task.id),
-      });
+      try {
+        // Delete weapons one by one
+        for (const weapon of weapons) {
+          await deleteWeapon(weapon.id);
+        }
 
-      if (error) {
-        toast.error(error);
-        return;
+        props.onOpenChange?.(false);
+        toast.success(`${weapons.length === 1 ? "Weapon" : "Weapons"} deleted`);
+        onSuccess?.();
+      } catch (error) {
+        console.error("Error deleting weapons:", error);
+        toast.error("Failed to delete weapons");
       }
-
-      props.onOpenChange?.(false);
-      toast.success("Tasks deleted");
-      onSuccess?.();
     });
   }
 
@@ -71,7 +70,7 @@ export function DeleteTasksDialog({
           <DialogTrigger asChild>
             <Button variant="outline" size="sm">
               <Trash className="mr-2 size-4" aria-hidden="true" />
-              Delete ({tasks.length})
+              Delete ({weapons.length})
             </Button>
           </DialogTrigger>
         ) : null}
@@ -79,9 +78,9 @@ export function DeleteTasksDialog({
           <DialogHeader>
             <DialogTitle>Are you absolutely sure?</DialogTitle>
             <DialogDescription>
-              This action cannot be undone. This will permanently delete your{" "}
-              <span className="font-medium">{tasks.length}</span>
-              {tasks.length === 1 ? " task" : " tasks"} from our servers.
+              This action cannot be undone. This will permanently delete
+              <span className="font-medium"> {weapons.length} </span>
+              {weapons.length === 1 ? " weapon" : " weapons"} from the database.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="gap-2 sm:space-x-0">
@@ -89,7 +88,7 @@ export function DeleteTasksDialog({
               <Button variant="outline">Cancel</Button>
             </DialogClose>
             <Button
-              aria-label="Delete selected rows"
+              aria-label="Delete selected weapons"
               variant="destructive"
               onClick={onDelete}
               disabled={isDeletePending}
@@ -114,7 +113,7 @@ export function DeleteTasksDialog({
         <DrawerTrigger asChild>
           <Button variant="outline" size="sm">
             <Trash className="mr-2 size-4" aria-hidden="true" />
-            Delete ({tasks.length})
+            Delete ({weapons.length})
           </Button>
         </DrawerTrigger>
       ) : null}
@@ -122,9 +121,9 @@ export function DeleteTasksDialog({
         <DrawerHeader>
           <DrawerTitle>Are you absolutely sure?</DrawerTitle>
           <DrawerDescription>
-            This action cannot be undone. This will permanently delete your{" "}
-            <span className="font-medium">{tasks.length}</span>
-            {tasks.length === 1 ? " task" : " tasks"} from our servers.
+            This action cannot be undone. This will permanently delete
+            <span className="font-medium"> {weapons.length} </span>
+            {weapons.length === 1 ? " weapon" : " weapons"} from the database.
           </DrawerDescription>
         </DrawerHeader>
         <DrawerFooter className="gap-2 sm:space-x-0">
@@ -132,7 +131,7 @@ export function DeleteTasksDialog({
             <Button variant="outline">Cancel</Button>
           </DrawerClose>
           <Button
-            aria-label="Delete selected rows"
+            aria-label="Delete selected weapons"
             variant="destructive"
             onClick={onDelete}
             disabled={isDeletePending}
