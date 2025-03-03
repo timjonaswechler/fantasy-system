@@ -54,7 +54,7 @@ const WeaponCategory = {
 // Load JSON data
 function loadJsonFile(filePath) {
     try {
-        const fullPath = path.join(__dirname, '..', 'src', 'data', 'weapons', filePath);
+        const fullPath = path.join(__dirname, '..', 'src', 'data', 'seed', 'weapons', filePath);
         const data = fs.readFileSync(fullPath, 'utf8');
         return JSON.parse(data);
     } catch (error) {
