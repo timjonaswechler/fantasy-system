@@ -73,16 +73,15 @@ export function DataTableSortList<TData>({
       .withOptions({
         clearOnDefault: true,
         shallow,
-      }),
+      })
   );
 
   const uniqueSorting = React.useMemo(
     () =>
       sorting.filter(
-        (sort, index, self) =>
-          index === self.findIndex((t) => t.id === sort.id),
+        (sort, index, self) => index === self.findIndex((t) => t.id === sort.id)
       ),
-    [sorting],
+    [sorting]
   );
 
   const debouncedSetSorting = useDebouncedCallback(setSorting, debounceMs);
@@ -93,19 +92,19 @@ export function DataTableSortList<TData>({
         .getAllColumns()
         .filter(
           (column) =>
-            column.getCanSort() && !sorting.some((s) => s.id === column.id),
+            column.getCanSort() && !sorting.some((s) => s.id === column.id)
         )
         .map((column) => ({
           id: column.id,
           label: toSentenceCase(column.id),
           selected: false,
         })),
-    [sorting, table],
+    [sorting, table]
   );
 
   function addSort() {
     const firstAvailableColumn = sortableColumns.find(
-      (column) => !sorting.some((s) => s.id === column.id),
+      (column) => !sorting.some((s) => s.id === column.id)
     );
     if (!firstAvailableColumn) return;
 
@@ -133,7 +132,7 @@ export function DataTableSortList<TData>({
       if (!prevSorting) return prevSorting;
 
       const updatedSorting = prevSorting.map((sort) =>
-        sort.id === id ? { ...sort, ...field } : sort,
+        sort.id === id ? { ...sort, ...field } : sort
       );
       return updatedSorting;
     });
@@ -141,7 +140,7 @@ export function DataTableSortList<TData>({
 
   function removeSort(id: string) {
     void setSorting((prevSorting) =>
-      prevSorting.filter((item) => item.id !== id),
+      prevSorting.filter((item) => item.id !== id)
     );
   }
 
@@ -165,7 +164,7 @@ export function DataTableSortList<TData>({
             {uniqueSorting.length > 0 && (
               <Badge
                 variant="secondary"
-                className="h-[1.14rem] rounded-[0.2rem] px-[0.32rem] font-mono font-normal text-[0.65rem]"
+                className="h-[1.14rem] rounded-[0.2rem] px-[0.32rem] font-normal font-normal text-[0.65rem]"
               >
                 {uniqueSorting.length}
               </Badge>
@@ -178,7 +177,7 @@ export function DataTableSortList<TData>({
           collisionPadding={16}
           className={cn(
             "flex w-[calc(100vw-theme(spacing.20))] min-w-72 max-w-[25rem] origin-[var(--radix-popover-content-transform-origin)] flex-col p-4 sm:w-[25rem]",
-            sorting.length > 0 ? "gap-3.5" : "gap-2",
+            sorting.length > 0 ? "gap-3.5" : "gap-2"
           )}
         >
           {uniqueSorting.length > 0 ? (
@@ -220,7 +219,7 @@ export function DataTableSortList<TData>({
                               initialSorting[0]?.id === sort.id ? (
                                 <Badge
                                   variant="secondary"
-                                  className="h-[1.125rem] rounded px-1 font-mono font-normal text-[0.65rem]"
+                                  className="h-[1.125rem] rounded px-1 font-normal font-normal text-[0.65rem]"
                                 >
                                   Default
                                 </Badge>
@@ -273,7 +272,7 @@ export function DataTableSortList<TData>({
                                         "ml-auto size-4 shrink-0",
                                         column.id === sort.id
                                           ? "opacity-100"
-                                          : "opacity-0",
+                                          : "opacity-0"
                                       )}
                                       aria-hidden="true"
                                     />

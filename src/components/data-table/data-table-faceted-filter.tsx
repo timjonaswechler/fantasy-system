@@ -34,7 +34,7 @@ export function DataTableFacetedFilter<TData, TValue>({
 }: DataTableFacetedFilterProps<TData, TValue>) {
   const unknownValue = column?.getFilterValue();
   const selectedValues = new Set(
-    Array.isArray(unknownValue) ? unknownValue : [],
+    Array.isArray(unknownValue) ? unknownValue : []
   );
 
   return (
@@ -98,7 +98,7 @@ export function DataTableFacetedFilter<TData, TValue>({
                       }
                       const filterValues = Array.from(selectedValues);
                       column?.setFilterValue(
-                        filterValues.length ? filterValues : undefined,
+                        filterValues.length ? filterValues : undefined
                       );
                     }}
                   >
@@ -107,7 +107,7 @@ export function DataTableFacetedFilter<TData, TValue>({
                         "mr-2 flex size-4 items-center justify-center rounded-sm border border-primary",
                         isSelected
                           ? "bg-primary text-primary-foreground"
-                          : "opacity-50 [&_svg]:invisible",
+                          : "opacity-50 [&_svg]:invisible"
                       )}
                     >
                       <Check className="size-4" aria-hidden="true" />
@@ -119,8 +119,8 @@ export function DataTableFacetedFilter<TData, TValue>({
                       />
                     )}
                     <span>{option.label}</span>
-                    {option.count && (
-                      <span className="ml-auto flex size-4 items-center justify-center font-mono text-xs">
+                    {option.count !== undefined && (
+                      <span className="ml-auto flex size-4 items-center justify-center font-normal text-xs">
                         {option.count}
                       </span>
                     )}
