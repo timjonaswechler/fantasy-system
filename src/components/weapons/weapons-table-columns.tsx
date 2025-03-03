@@ -86,6 +86,21 @@ export function getColumns({
       },
     },
     {
+      accessorKey: "description",
+      header: ({ column }) => (
+        <DataTableColumnHeader column={column} title="Description" />
+      ),
+      cell: ({ row }) => {
+        return (
+          <div className="flex items-center space-x-2">
+            <span className="max-w-[31.25rem] truncate text-sm text-muted">
+              {row.getValue("description") || "N/A"}
+            </span>
+          </div>
+        );
+      },
+    },
+    {
       accessorKey: "type",
       header: ({ column }) => (
         <DataTableColumnHeader column={column} title="Type" />
@@ -183,6 +198,101 @@ export function getColumns({
         return value.some((v) => graspTypes.includes(v as GraspType));
       },
       size: 30,
+    },
+    {
+      accessorKey: "material",
+      header: ({ column }) => (
+        <DataTableColumnHeader column={column} title="Material" />
+      ),
+      cell: ({ row }) => {
+        const material = row.original.material;
+        return <span>{material}</span>;
+      },
+    },
+    {
+      accessorKey: "durability",
+      header: ({ column }) => (
+        <DataTableColumnHeader column={column} title="Durability" />
+      ),
+      cell: ({ row }) => {
+        const durability = row.original.durability;
+        return <span>{durability}</span>;
+      },
+    },
+    {
+      accessorKey: "imageUrl",
+      header: ({ column }) => (
+        <DataTableColumnHeader column={column} title="Image" />
+      ),
+      cell: ({ row }) => {
+        const imageUrl = row.original.imageUrl;
+        return (
+          <img
+            src={imageUrl}
+            alt="Weapon Image"
+            className="w-10 h-10 rounded-md object-cover"
+          />
+        );
+      },
+    },
+    {
+      accessorKey: "weight",
+      header: ({ column }) => (
+        <DataTableColumnHeader column={column} title="Weight" />
+      ),
+      cell: ({ row }) => {
+        const weight = row.original.weight;
+        return (
+          <div className="flex items-center">
+            <span>
+              {weight[0]} - {weight[1]}
+            </span>
+          </div>
+        );
+      },
+    },
+    {
+      accessorKey: "properties",
+      header: ({ column }) => (
+        <DataTableColumnHeader column={column} title="Properties" />
+      ),
+      cell: ({ row }) => {
+        const properties = row.original.properties;
+
+        return (
+          <div className="flex items-center gap-1">
+            {properties.map((prop) => (
+              <Badge key={prop} variant="outline" className="capitalize">
+                {prop}
+              </Badge>
+            ))}
+          </div>
+        );
+      },
+      filterFn: (row, id, value) => {
+        // Custom filter function for the properties array
+        if (!Array.isArray(value) || value.length === 0) return true;
+        const weaponProps = row.original.properties;
+        return value.some((v) => weaponProps.includes(v));
+      },
+      size: 30,
+    },
+    {
+      accessorKey: "range",
+      header: ({ column }) => (
+        <DataTableColumnHeader column={column} title="Range" />
+      ),
+      cell: ({ row }) => {
+        const range = row.original.range;
+        if (!range) return <span>N/A</span>;
+
+        return (
+          <div className="flex items-center gap-1">
+            <Eye className="size-4 text-muted-foreground" aria-hidden="true" />
+            <span>{range.size - 1}</span>
+          </div>
+        );
+      },
     },
     {
       id: "actions",

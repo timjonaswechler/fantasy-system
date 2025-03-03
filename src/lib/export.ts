@@ -1,6 +1,11 @@
+// Add this function to src/lib/export.ts
+
 import type { Table } from "@tanstack/react-table";
 
-export function exportTableToCSV<TData>(
+/**
+ * Exports table data to JSON file and triggers download
+ */
+export function exportTableToJSON<TData>(
   /**
    * The table to export.
    * @type Table<TData>
@@ -8,13 +13,13 @@ export function exportTableToCSV<TData>(
   table: Table<TData>,
   opts: {
     /**
-     * The filename for the CSV file.
-     * @default "table"
-     * @example "tasks"
+     * The filename for the JSON file.
+     * @default "export"
+     * @example "weapons"
      */
     filename?: string;
     /**
-     * The columns to exclude from the CSV file.
+     * The columns to exclude from the JSON file.
      * @default []
      * @example ["select", "actions"]
      */
@@ -28,48 +33,65 @@ export function exportTableToCSV<TData>(
   } = {}
 ): void {
   const {
-    filename = "table",
+    filename = "export",
     excludeColumns = [],
-    onlySelected = false,
+    onlySelected = true,
   } = opts;
 
-  // Retrieve headers (column names)
-  const headers = table
+  // Get columns to include in export
+  const columns = table
     .getAllLeafColumns()
-    .map((column) => column.id)
     .filter(
-      (id) => !excludeColumns.includes(id as keyof TData | "select" | "actions")
-    );
+      (column) =>
+        !excludeColumns.includes(
+          column.id as keyof TData | "select" | "actions"
+        )
+    )
+    .map((column) => column.id);
 
-  // Build CSV content
-  const csvContent = [
-    headers.join(","),
-    ...(onlySelected
-      ? table.getFilteredSelectedRowModel().rows
-      : table.getRowModel().rows
-    ).map((row) =>
-      headers
-        .map((header) => {
-          const cellValue = row.getValue(header);
-          // Handle values that might contain commas or newlines
-          return typeof cellValue === "string"
-            ? `"${cellValue.replace(/"/g, '""')}"`
-            : cellValue;
-        })
-        .join(",")
-    ),
-  ].join("\n");
+  // Get rows based on selection option
+  const rows = onlySelected
+    ? table.getFilteredSelectedRowModel().rows
+    : table.getRowModel().rows;
 
-  // Create a Blob with CSV content
-  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+  // Create JSON data
+  const jsonData = rows.map((row) => {
+    const rowData: Record<string, any> = {};
 
-  // Create a link and trigger the download
+    columns.forEach((columnId) => {
+      let value = row.getValue(columnId);
+
+      // Ensure weight values are numbers, not strings
+      if (columnId === "weight" && Array.isArray(value)) {
+        value = value.map((item) =>
+          typeof item === "string" ? parseFloat(item) : item
+        );
+      }
+
+      // Ensure baseDamage values are numbers
+      if (columnId === "baseDamage" && Array.isArray(value)) {
+        value = value.map((item) =>
+          typeof item === "string" ? parseInt(item, 10) : item
+        );
+      }
+
+      rowData[columnId] = value;
+    });
+
+    return rowData;
+  });
+
+  // Create and download file
+  const blob = new Blob([JSON.stringify(jsonData, null, 2)], {
+    type: "application/json",
+  });
+
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
-  link.setAttribute("href", url);
-  link.setAttribute("download", `${filename}.csv`);
-  link.style.visibility = "hidden";
+  link.href = url;
+  link.download = `${filename}.json`;
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
+  URL.revokeObjectURL(url);
 }

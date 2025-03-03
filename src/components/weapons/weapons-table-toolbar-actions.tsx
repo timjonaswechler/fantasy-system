@@ -2,12 +2,13 @@
 
 import { IWeapon } from "@/actions/weapons";
 import type { Table } from "@tanstack/react-table";
-import { Download, Plus } from "lucide-react";
+import { Download, Plus, Upload } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { exportTableToCSV } from "@/lib/export";
+import { exportTableToJSON } from "@/lib/export";
 
 import { DeleteWeaponsDialog } from "./delete-weapons-dialog";
+import { ImportWeaponsDialog } from "./import-weapons-dialog";
 
 interface WeaponsTableToolbarActionsProps {
   table: Table<IWeapon>;
@@ -18,31 +19,41 @@ export function WeaponsTableToolbarActions({
   table,
   onCreateWeapon,
 }: WeaponsTableToolbarActionsProps) {
+  const selectedRows = table.getFilteredSelectedRowModel().rows;
+  const hasSelectedRows = selectedRows.length > 0;
+
   return (
     <div className="flex items-center gap-2">
-      {table.getFilteredSelectedRowModel().rows.length > 0 ? (
-        <DeleteWeaponsDialog
-          weapons={table
-            .getFilteredSelectedRowModel()
-            .rows.map((row) => row.original)}
-          onSuccess={() => table.toggleAllRowsSelected(false)}
-        />
-      ) : null}
+      {hasSelectedRows ? (
+        <>
+          <DeleteWeaponsDialog
+            weapons={selectedRows.map((row) => row.original)}
+            onSuccess={() => table.toggleAllRowsSelected(false)}
+          />
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() =>
+              exportTableToJSON(table, {
+                filename: "weapons",
+                excludeColumns: ["select", "actions"],
+                onlySelected: true,
+              })
+            }
+            className="gap-2"
+          >
+            <Download className="size-4" aria-hidden="true" />
+            Export JSON
+          </Button>
+        </>
+      ) : (
+        <Button variant="outline" size="sm" disabled className="gap-2">
+          <Download className="size-4" aria-hidden="true" />
+          Export JSON
+        </Button>
+      )}
 
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={() =>
-          exportTableToCSV(table, {
-            filename: "weapons",
-            excludeColumns: ["select", "actions"],
-          })
-        }
-        className="gap-2"
-      >
-        <Download className="size-4" aria-hidden="true" />
-        Export
-      </Button>
+      <ImportWeaponsDialog onSuccess={onCreateWeapon} />
 
       <Button size="sm" className="gap-2" onClick={onCreateWeapon}>
         <Plus className="size-4" aria-hidden="true" />
