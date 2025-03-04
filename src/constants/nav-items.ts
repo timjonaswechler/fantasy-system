@@ -17,8 +17,8 @@ export const data = {
           url: "/weapons",
         },
         {
-          title: "Starred",
-          url: "#",
+          title: "Materials",
+          url: "/materials",
         },
         {
           title: "Settings",
