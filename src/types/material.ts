@@ -70,7 +70,7 @@ export interface IMaterial {
       color?: string;
     }
   >;
-
+  isComposite?: boolean;
   // Creation date
   createdAt: Date;
 }
