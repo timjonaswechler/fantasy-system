@@ -340,90 +340,115 @@ async function seedMaterialsData() {
     console.log("Starting material seed process...");
 
     const client = await pool.connect();
+    let insertedCount = 0;
+    let skippedCount = 0;
+    let failureCount = 0;
 
     try {
         // Begin transaction
         await client.query('BEGIN');
 
         for (const material of sampleMaterials) {
-            console.log(`Adding material: ${material.name}`);
+            try {
+                // Check if material already exists
+                const existingMaterial = await client.query(
+                    'SELECT id FROM materials WHERE material_id = $1',
+                    [material.material_id]
+                );
 
-            // Insert main material record
-            const materialResult = await client.query(
-                `INSERT INTO materials (
-          material_id, name, description, category, 
-          density, melting_point, boiling_point, ignite_point,
-          impact_yield, impact_fracture, shear_yield, shear_fracture,
-          hardness, sharpness, durability,
-          color, color_hex, is_magical, is_rare, value_modifier,
-          source_location, source_creature, source_plant
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23)
-        RETURNING id`,
-                [
-                    material.material_id,
-                    material.name,
-                    material.description,
-                    material.category,
-                    material.density,
-                    material.melting_point,
-                    material.boiling_point,
-                    material.ignite_point,
-                    material.impact_yield,
-                    material.impact_fracture,
-                    material.shear_yield,
-                    material.shear_fracture,
-                    material.hardness,
-                    material.sharpness,
-                    material.durability,
-                    material.color,
-                    material.color_hex,
-                    material.is_magical,
-                    material.is_rare,
-                    material.value_modifier,
-                    material.source_location,
-                    material.source_creature,
-                    material.source_plant
-                ]
-            );
-
-            const materialId = materialResult.rows[0].id;
-
-            // Insert states
-            if (material.states && material.states.length > 0) {
-                for (const state of material.states) {
-                    await client.query(
-                        `INSERT INTO material_states (material_id, state_name, state_description, state_color)
-            VALUES ($1, $2, $3, $4)`,
-                        [materialId, state.state_name, state.state_description, state.state_color]
-                    );
+                if (existingMaterial.rows.length > 0) {
+                    console.log(`⏭️ Material with ID ${material.material_id} already exists, skipping...`);
+                    skippedCount++;
+                    continue;
                 }
-            }
 
-            // Insert properties
-            if (material.properties && material.properties.length > 0) {
-                for (const prop of material.properties) {
-                    await client.query(
-                        `INSERT INTO material_properties (material_id, property_name, property_value)
-            VALUES ($1, $2, $3)`,
-                        [materialId, prop.property_name, prop.property_value]
-                    );
+                // console.log(`🔄 Processing material: ${material.name}`);
+
+                // Insert main material record
+                const materialResult = await client.query(
+                    `INSERT INTO materials (
+                      material_id, name, description, category, 
+                      density, melting_point, boiling_point, ignite_point,
+                      impact_yield, impact_fracture, shear_yield, shear_fracture,
+                      hardness, sharpness, durability,
+                      color, color_hex, is_magical, is_rare, value_modifier,
+                      source_location, source_creature, source_plant
+                    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23)
+                    RETURNING id`,
+                    [
+                        material.material_id,
+                        material.name,
+                        material.description,
+                        material.category,
+                        material.density,
+                        material.melting_point,
+                        material.boiling_point,
+                        material.ignite_point,
+                        material.impact_yield,
+                        material.impact_fracture,
+                        material.shear_yield,
+                        material.shear_fracture,
+                        material.hardness,
+                        material.sharpness,
+                        material.durability,
+                        material.color,
+                        material.color_hex,
+                        material.is_magical,
+                        material.is_rare,
+                        material.value_modifier,
+                        material.source_location,
+                        material.source_creature,
+                        material.source_plant
+                    ]
+                );
+
+                const materialId = materialResult.rows[0].id;
+
+                // Insert states
+                if (material.states && material.states.length > 0) {
+                    for (const state of material.states) {
+                        await client.query(
+                            `INSERT INTO material_states (material_id, state_name, state_description, state_color)
+                            VALUES ($1, $2, $3, $4)`,
+                            [materialId, state.state_name, state.state_description, state.state_color]
+                        );
+                    }
                 }
+
+                // Insert properties
+                if (material.properties && material.properties.length > 0) {
+                    for (const prop of material.properties) {
+                        await client.query(
+                            `INSERT INTO material_properties (material_id, property_name, property_value)
+                            VALUES ($1, $2, $3)`,
+                            [materialId, prop.property_name, prop.property_value]
+                        );
+                    }
+                }
+
+                insertedCount++;
+                console.log(`✅ Successfully added material: ${material.name}`);
+            } catch (error) {
+                failureCount++;
+                console.error(`❌ Error adding material ${material.name}: ${error.message}`);
             }
         }
 
         // Commit transaction
         await client.query('COMMIT');
-        console.log("Materials seed completed successfully");
+        console.log(`\nMaterials seeding completed: ${insertedCount} successful, ${skippedCount} skipped, ${failureCount} failed`);
+        console.log(`Total materials attempted: ${sampleMaterials.length}`);
 
     } catch (error) {
         // Rollback in case of error
         await client.query('ROLLBACK');
-        console.error("Error seeding materials:", error);
+        console.error("❌ Error seeding materials:", error);
         throw error;
     } finally {
         client.release();
     }
 }
+
 
 // Run the seed function
 seedMaterialsData()

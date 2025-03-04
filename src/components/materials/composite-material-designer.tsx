@@ -47,7 +47,7 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
 import { Slider } from "@/components/ui/slider";
-import { IMaterial } from "@/types/material";
+import { IMaterial, MaterialCategory } from "@/types/material";
 import {
   calculateCompositeProperties,
   createCompositeMaterial,
@@ -89,7 +89,15 @@ type CompositeFormValues = z.infer<typeof compositeSchema>;
 
 interface CompositeMaterialDesignerProps
   extends React.ComponentPropsWithRef<typeof Sheet> {
-  availableMaterials: IMaterial[];
+  availableMaterials: Array<{
+    id: string;
+    name: string;
+    category: MaterialCategory;
+    colorHex?: string;
+    hardness?: number;
+    durability?: number;
+    isComposite?: boolean;
+  }>;
   onSuccess?: (materialId: string) => void;
 }
 

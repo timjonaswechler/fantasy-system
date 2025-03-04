@@ -172,26 +172,26 @@ export function useDataTable<TData>({
   ]);
 
   const [rowSelection, setRowSelection] = React.useState<RowSelectionState>(
-    initialState?.rowSelection ?? {},
+    initialState?.rowSelection ?? {}
   );
   const [columnVisibility, setColumnVisibility] =
     React.useState<VisibilityState>(initialState?.columnVisibility ?? {});
 
   const [page, setPage] = useQueryState(
     "page",
-    parseAsInteger.withOptions(queryStateOptions).withDefault(1),
+    parseAsInteger.withOptions(queryStateOptions).withDefault(1)
   );
   const [perPage, setPerPage] = useQueryState(
     "perPage",
     parseAsInteger
       .withOptions(queryStateOptions)
-      .withDefault(initialState?.pagination?.pageSize ?? 10),
+      .withDefault(initialState?.pagination?.pageSize ?? 10)
   );
   const [sorting, setSorting] = useQueryState(
     "sort",
     getSortingStateParser<TData>()
       .withOptions(queryStateOptions)
-      .withDefault(initialState?.sorting ?? []),
+      .withDefault(initialState?.sorting ?? [])
   );
 
   // Create parsers for each filter field
@@ -202,7 +202,7 @@ export function useDataTable<TData>({
       if (field.options) {
         // Faceted filter
         acc[field.id] = parseAsArrayOf(parseAsString, ",").withOptions(
-          queryStateOptions,
+          queryStateOptions
         );
       } else {
         // Search filter
@@ -214,10 +214,13 @@ export function useDataTable<TData>({
 
   const [filterValues, setFilterValues] = useQueryStates(filterParsers);
 
-  const debouncedSetFilterValues = useDebouncedCallback((values: typeof filterValues) => {
-    void setPage(1);
-    void setFilterValues(values);
-  }, debounceMs);
+  const debouncedSetFilterValues = useDebouncedCallback(
+    (values: typeof filterValues) => {
+      void setPage(1);
+      void setFilterValues(values);
+    },
+    debounceMs
+  );
 
   // Paginate
   const pagination: PaginationState = {
@@ -258,7 +261,7 @@ export function useDataTable<TData>({
             }
             return filters;
           },
-          [],
+          []
         );
   }, [filterValues, enableAdvancedFilter]);
 
@@ -315,7 +318,7 @@ export function useDataTable<TData>({
       filterableColumns,
       searchableColumns,
       setPage,
-    ],
+    ]
   );
 
   const table = useReactTable({

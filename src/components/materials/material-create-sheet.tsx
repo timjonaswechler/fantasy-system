@@ -132,7 +132,18 @@ interface MaterialCreateSheetProps
   }>;
   onSuccess?: (materialId?: string) => void;
 }
-
+interface CompositeMaterialDesignerProps
+  extends React.ComponentPropsWithRef<typeof Sheet> {
+  availableMaterials: Array<{
+    id: string;
+    name: string;
+    category: MaterialCategory;
+    colorHex?: string;
+    hardness?: number;
+    durability?: number;
+  }>;
+  onSuccess?: (materialId: string) => void;
+}
 export function MaterialCreateSheet({
   availableMaterials = [],
   onSuccess,

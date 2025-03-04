@@ -31,9 +31,9 @@ const GraspType = {
     TWO_HANDED: 'TWO_HANDED'
 };
 
+// Fix for category mismatch - make sure these exactly match your database enum values
 const WeaponCategory = {
-    //MELLEE
-    DAGGERS: "DAGGERS",
+    DAGGER: "DAGGER",
     SWORDS: "SWORDS",
     MACES: "MACES",
     SPEARS: "SPEARS",
@@ -42,14 +42,53 @@ const WeaponCategory = {
     CLEAVERS: "CLEAVERS",
     HAMMERS: "HAMMERS",
     POLEARMS: "POLEARMS",
-
-    // RANGED
     BOWS: "BOWS",
     CROSSBOWS: "CROSSBOWS",
     FIREARMS: "FIREARMS",
-    THROWING_WEAPONS: "THROWING_WEAPONS",
     THROWABLE_ITEMS: "THROWABLE_ITEMS",
 };
+
+// Function to validate database enums exist
+async function validateEnums() {
+    const client = await pool.connect();
+    try {
+        // Check if our enum types match what's in the database
+        const weaponTypeEnum = await client.query(`
+            SELECT enumlabel FROM pg_enum 
+            JOIN pg_type ON pg_enum.enumtypid = pg_type.oid 
+            WHERE typname = 'weapon_type'
+        `);
+
+        const weaponCategoryEnum = await client.query(`
+            SELECT enumlabel FROM pg_enum 
+            JOIN pg_type ON pg_enum.enumtypid = pg_type.oid 
+            WHERE typname = 'weapon_category'
+        `);
+
+        // Log the enum values from the database for debugging
+        console.log("Database weapon_type values:", weaponTypeEnum.rows.map(row => row.enumlabel));
+        console.log("Database weapon_category values:", weaponCategoryEnum.rows.map(row => row.enumlabel));
+
+        // Update our WeaponCategory object to match database values
+        if (weaponCategoryEnum.rows.length > 0) {
+            const dbCategories = {};
+            weaponCategoryEnum.rows.forEach(row => {
+                dbCategories[row.enumlabel] = row.enumlabel;
+            });
+
+            // Override our WeaponCategory with database values
+            Object.assign(WeaponCategory, dbCategories);
+            console.log("Updated WeaponCategory to match database:", WeaponCategory);
+        }
+
+        return true;
+    } catch (error) {
+        console.error("Error validating enums:", error);
+        return false;
+    } finally {
+        client.release();
+    }
+}
 
 // Load JSON data
 function loadJsonFile(filePath) {
@@ -81,7 +120,7 @@ function convertWeaponData(data) {
         name: weapon.name,
         description: weapon.description || "",
         type: weapon.type || WeaponType.MELEE,
-        category: weapon.category,
+        category: weapon.category === 'DAGGER' ? WeaponCategory.DAGGER : weapon.category,
         baseDamageMin: weapon.baseDamage ? weapon.baseDamage[0] : 0,
         baseDamageMax: weapon.baseDamage ? weapon.baseDamage[1] : 0,
         weightMin: weapon.weight ? weapon.weight[0] : 0,
@@ -104,34 +143,26 @@ function generateWeaponId(name) {
         .replace(/^-|-$/g, '');
 }
 
+// Check if a weapon already exists in the database
+async function weaponExists(client, weaponId) {
+    const result = await client.query(
+        'SELECT id FROM weapons WHERE weapon_id = $1',
+        [weaponId]
+    );
+    return result.rows.length > 0;
+}
+
 // Seed a single weapon to the database
 async function seedWeapon(client, weapon) {
     try {
         // Generate weapon_id
         const weaponId = generateWeaponId(weapon.name);
 
-        // Validate the weapon type
-        if (!Object.values(WeaponType).includes(weapon.type)) {
-            throw new Error(`Invalid weapon type: ${weapon.type}`);
-        }
-
-        // Validate the weapon category
-        if (!Object.values(WeaponCategory).includes(weapon.category)) {
-            // Special case for daggers - there's a mismatch between the enum and the data
-            if (weapon.category === 'DAGGER') {
-                weapon.category = WeaponCategory.DAGGERS;
-            } else {
-                throw new Error(`Invalid weapon category: ${weapon.category}`);
-            }
-        }
-
-        // Validate grasp types
-        if (weapon.grasp && weapon.grasp.length > 0) {
-            for (let i = 0; i < weapon.grasp.length; i++) {
-                if (!Object.values(GraspType).includes(weapon.grasp[i])) {
-                    throw new Error(`Invalid grasp type: ${weapon.grasp[i]}`);
-                }
-            }
+        // Check if weapon already exists
+        const exists = await weaponExists(client, weaponId);
+        if (exists) {
+            // console.log(`Weapon ${weapon.name} already exists, skipping...`);
+            return { success: true, id: weaponId, skipped: true };
         }
 
         // Make sure properties is an array
@@ -141,14 +172,14 @@ async function seedWeapon(client, weapon) {
 
         // Insert weapon into database
         const result = await client.query(`
-      INSERT INTO weapons (
-        weapon_id, name, description, type, category,
-        base_damage_min, base_damage_max, weight_min, weight_max,
-        price, material, durability, properties, image_url
-      ) VALUES (
-        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14
-      ) RETURNING id
-    `, [
+            INSERT INTO weapons (
+                weapon_id, name, description, type, category,
+                base_damage_min, base_damage_max, weight_min, weight_max,
+                price, material, durability, properties, image_url
+            ) VALUES (
+                $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14
+            ) RETURNING id
+        `, [
             weaponId,
             weapon.name,
             weapon.description,
@@ -171,9 +202,9 @@ async function seedWeapon(client, weapon) {
         if (weapon.grasp && weapon.grasp.length > 0) {
             for (const grasp of weapon.grasp) {
                 await client.query(`
-          INSERT INTO weapon_grasp (weapon_id, grasp_type)
-          VALUES ($1, $2)
-        `, [weaponDbId, grasp]);
+                    INSERT INTO weapon_grasp (weapon_id, grasp_type)
+                    VALUES ($1, $2)
+                `, [weaponDbId, grasp]);
             }
         }
 
@@ -181,74 +212,95 @@ async function seedWeapon(client, weapon) {
         if (weapon.rangeData && weapon.rangeData.length > 0) {
             for (const range of weapon.rangeData) {
                 await client.query(`
-          INSERT INTO weapon_range (weapon_id, precision_value, distance)
-          VALUES ($1, $2, $3)
-        `, [weaponDbId, range.precision, range.distance]);
+                    INSERT INTO weapon_range (weapon_id, precision_value, distance)
+                    VALUES ($1, $2, $3)
+                `, [weaponDbId, range.precision, range.distance]);
             }
         }
 
-        return weaponId;
+        return { success: true, id: weaponId };
     } catch (error) {
-        throw error;
+        // console.error(`Error seeding weapon ${weapon.name}:`, error.message);
+        return { success: false, error: error.message };
     }
 }
 
 async function main() {
-    // Load all weapon JSON files
-    const weaponDataSets = [
-        loadJsonFile('axes.json'),
-        loadJsonFile('bows.json'),
-        loadJsonFile('cleavers.json'),
-        loadJsonFile('crossbows.json'),
-        loadJsonFile('daggers.json'),
-        loadJsonFile('firearms.json'),
-        loadJsonFile('flails.json'),
-        loadJsonFile('hammers.json'),
-        loadJsonFile('maces.json'),
-        loadJsonFile('polearms.json'),
-        loadJsonFile('spears.json'),
-        loadJsonFile('swords.json'),
-        loadJsonFile('throwables.json'),
-        loadJsonFile('throwing_weapons.json')
-    ];
+    // First validate our enum values against the database
+    const enumsValid = await validateEnums();
+    if (!enumsValid) {
+        console.error("ERROR: Database enums don't match expected values. Please check your migrations.");
+        process.exit(1);
+    }
 
+    // Load all weapon JSON files
+    const weaponFiles = [
+        'axes.json',
+        'bows.json',
+        'cleavers.json',
+        'crossbows.json',
+        'daggers.json',
+        'firearms.json',
+        'flails.json',
+        'hammers.json',
+        'maces.json',
+        'polearms.json',
+        'spears.json',
+        'swords.json',
+        'throwables.json',
+        // 'throwing_weapons.json'
+    ];
+    // Execute the main function
     // Combine all weapon data
     const allWeaponsData = [];
-    for (const dataSet of weaponDataSets) {
-        allWeaponsData.push(...convertWeaponData(dataSet));
+    for (const file of weaponFiles) {
+        const data = loadJsonFile(file);
+        const converted = convertWeaponData(data);
+        allWeaponsData.push(...converted);
+        console.log(`Loaded ${converted.length} weapons from ${file}`);
     }
 
     console.log(`Found ${allWeaponsData.length} weapons to seed`);
+    console.log("Starting weapons seeding process...");
 
     // Process each weapon separately to avoid losing everything on error
     let successCount = 0;
+    let failureCount = 0;
+    let skipCount = 0;
+
     for (const weapon of allWeaponsData) {
         const client = await pool.connect();
         try {
             await client.query('BEGIN');
 
-            const id = await seedWeapon(client, weapon);
+            const result = await seedWeapon(client, weapon);
 
-            await client.query('COMMIT');
-            console.log(`Seeded weapon: ${weapon.name} (${id})`);
-            successCount++;
+            if (result.success) {
+                await client.query('COMMIT');
+                if (result.skipped) {
+                    skipCount++;
+                    console.log(`⏭️ Skipped existing weapon: ${weapon.name}`);
+                } else {
+                    successCount++;
+                    console.log(`✅ Successfully seeded weapon: ${weapon.name} (${result.id})`);
+                }
+            } else {
+                await client.query('ROLLBACK');
+                failureCount++;
+                console.error(`❌ Failed to seed weapon ${weapon.name}: ${result.error}`);
+            }
         } catch (error) {
             await client.query('ROLLBACK');
-            console.error(`Failed to seed weapon ${weapon.name}:`, error.message);
-
-            // Print more details about the weapon that failed
-            console.error('Weapon details:', JSON.stringify({
-                name: weapon.name,
-                type: weapon.type,
-                category: weapon.category,
-                grasp: weapon.grasp
-            }, null, 2));
+            failureCount++;
+            console.error(`❌ Error processing weapon ${weapon.name}: ${error.message}`);
         } finally {
             client.release();
         }
     }
 
-    console.log(`Successfully seeded ${successCount}/${allWeaponsData.length} weapons.`);
+    console.log(`\nSeeding completed: ${successCount} successful, ${skipCount} skipped, ${failureCount} failed`);
+    console.log(`Total weapons attempted: ${allWeaponsData.length}`);
+
     await pool.end();
 }
 

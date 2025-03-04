@@ -1,7 +1,10 @@
 // src/components/materials/material-detail-sheet.tsx
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useState, useEffect } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
 import {
   Sheet,
   SheetContent,
@@ -13,63 +16,73 @@ import {
 } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
-import {
-  BarChart2,
-  Weight,
-  DollarSign,
-  Sparkles,
-  Flame,
-  Thermometer,
-  Droplet,
-  Edit,
-  Trash,
-  Focus,
-  Layers,
-  Plus,
-} from "lucide-react";
-import { IMaterial, MaterialCategory, MaterialState } from "@/types/material";
-import {
-  Radar,
-  RadarChart,
-  PolarGrid,
-  PolarAngleAxis,
-  ResponsiveContainer,
-} from "recharts";
-import {
-  MaterialTransformation,
-  TransformationType,
-  TransformationFormData,
-  TransformationResult,
-} from "@/types/material-transformation";
-import { CompositeMaterial } from "@/types/material-composite";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
+import { Edit, Trash, Sparkles, Layers } from "lucide-react";
+import { IMaterial, MaterialCategory, MaterialState } from "@/types/material";
+import { TransformationResult } from "@/types/material-transformation";
+import { Form } from "@/components/ui/form";
 
-import {
-  getSourceTransformationsForMaterial,
-  getTargetTransformationsForMaterial,
-  createTransformation,
-} from "@/actions/material-transformations";
-import { MaterialTransformationPanel } from "./material-transformation-panel";
-import { CompositeMaterialDesigner } from "./composite-material-designer";
+// Import our tab components
+import { BasicInfoTab } from "./detail-tabs/basic-info-tab";
+import { PhysicalPropertiesTab } from "./detail-tabs/physical-properties-tab";
+import { CustomPropertiesTab } from "./detail-tabs/custom-properties-tab";
+import { StatesTab } from "./detail-tabs/states-tab";
+import { TransformationsTab } from "./detail-tabs/transformations-tab";
+import { CompositionTab } from "./detail-tabs/composition-tab";
+
+// The schema helps structure our form
+const detailFormSchema = z.object({
+  name: z.string(),
+  description: z.string(),
+  category: z.nativeEnum(MaterialCategory),
+  density: z.number().optional(),
+  meltingPoint: z.number().optional(),
+  boilingPoint: z.number().optional(),
+  ignitePoint: z.number().optional(),
+  impactYield: z.number().optional(),
+  impactFracture: z.number().optional(),
+  shearYield: z.number().optional(),
+  shearFracture: z.number().optional(),
+  hardness: z.number().optional(),
+  sharpness: z.number().optional(),
+  durability: z.number().optional(),
+  color: z.string(),
+  colorHex: z.string().optional(),
+  isMagical: z.boolean().default(false),
+  isRare: z.boolean().default(false),
+  valueModifier: z.number().default(1),
+  sourceLocation: z.string().optional(),
+  sourceCreature: z.string().optional(),
+  sourcePlant: z.string().optional(),
+  properties: z
+    .array(
+      z.object({
+        name: z.string(),
+        value: z.string(),
+      })
+    )
+    .optional(),
+  states: z
+    .array(
+      z.object({
+        state: z.nativeEnum(MaterialState),
+        description: z.string().optional(),
+        color: z.string().optional(),
+      })
+    )
+    .optional(),
+});
+
+type DetailFormValues = z.infer<typeof detailFormSchema>;
 
 interface MaterialDetailSheetProps
   extends React.ComponentPropsWithRef<typeof Sheet> {
   material: IMaterial | null;
-  availableMaterials?: IMaterial[]; // For composite material designer
+  availableMaterials?: IMaterial[]; // For context about other materials
   onEdit?: () => void;
   onDelete?: () => void;
   onTransform?: (result: TransformationResult) => void;
-  onCreateTransformation?: (data: TransformationFormData) => void;
+  onCreateTransformation?: () => void;
 }
 
 export function MaterialDetailSheet({
@@ -82,83 +95,92 @@ export function MaterialDetailSheet({
   ...props
 }: MaterialDetailSheetProps) {
   const [activeTab, setActiveTab] = useState("overview");
-  const [isCompositeDesignerOpen, setIsCompositeDesignerOpen] = useState(false);
 
-  // States for transformations
-  const [sourceTransformations, setSourceTransformations] = useState<
-    MaterialTransformation[]
-  >([]);
-  const [targetTransformations, setTargetTransformations] = useState<
-    MaterialTransformation[]
-  >([]);
-  const [isLoadingTransformations, setIsLoadingTransformations] =
-    useState(false);
+  // Using a form to easily display the material data in read-only mode
+  const form = useForm<DetailFormValues>({
+    resolver: zodResolver(detailFormSchema),
+    defaultValues: {
+      name: "",
+      description: "",
+      category: MaterialCategory.METAL,
+      color: "",
+      colorHex: "#888888",
+      isMagical: false,
+      isRare: false,
+      valueModifier: 1,
+      properties: [],
+      states: [],
+    },
+  });
 
-  // Load transformations when material changes
+  // Update form values when material changes
   useEffect(() => {
-    const loadTransformations = async () => {
-      if (!material) return;
+    if (material) {
+      // Convert properties Map to array for form - fix type errors
+      const propertiesArray = Array.from(material.properties || new Map()).map(
+        ([key, val]) => ({
+          name: key,
+          value: val,
+        })
+      );
 
-      setIsLoadingTransformations(true);
-      try {
-        const sourceResult = await getSourceTransformationsForMaterial(
-          material.id
-        );
-        setSourceTransformations(sourceResult);
+      // Convert states Map to array for form - fix type errors
+      const statesArray = Array.from(material.states || new Map()).map(
+        ([state, data]) => ({
+          state: state as MaterialState,
+          description: data.description || "",
+          color: data.color || "",
+        })
+      );
 
-        const targetResult = await getTargetTransformationsForMaterial(
-          material.id
-        );
-        setTargetTransformations(targetResult);
-      } catch (error) {
-        console.error("Error loading transformations:", error);
-      } finally {
-        setIsLoadingTransformations(false);
-      }
-    };
-
-    loadTransformations();
-  }, [material]);
+      // Reset form with material data
+      form.reset({
+        name: material.name,
+        description: material.description,
+        category: material.category,
+        density: material.density,
+        meltingPoint: material.meltingPoint,
+        boilingPoint: material.boilingPoint,
+        ignitePoint: material.ignitePoint,
+        impactYield: material.impactYield,
+        impactFracture: material.impactFracture,
+        shearYield: material.shearYield,
+        shearFracture: material.shearFracture,
+        hardness: material.hardness,
+        sharpness: material.sharpness,
+        durability: material.durability,
+        color: material.color,
+        colorHex: material.colorHex || "",
+        isMagical: material.isMagical,
+        isRare: material.isRare || false,
+        valueModifier: material.valueModifier || 1,
+        sourceLocation: material.sourceLocation || "",
+        sourceCreature: material.sourceCreature || "",
+        sourcePlant: material.sourcePlant || "",
+        properties: propertiesArray,
+        states: statesArray,
+      });
+    }
+  }, [material, form]);
 
   if (!material) return null;
 
-  // Prepare data for radar chart
-  const getPropertyValue = (propertyName: string): number => {
-    const value = material[propertyName as keyof IMaterial];
-    if (typeof value === "number") return value;
-    return 0;
-  };
-
-  const radarData = [
-    {
-      property: "Hardness",
-      value: getPropertyValue("hardness") || 0,
-      fullMark: 100,
-    },
-    {
-      property: "Durability",
-      value: getPropertyValue("durability") || 0,
-      fullMark: 100,
-    },
-    {
-      property: "Sharpness",
-      value: getPropertyValue("sharpness") || 0,
-      fullMark: 100,
-    },
-    {
-      property: "Value",
-      value: (getPropertyValue("valueModifier") || 1) * 50,
-      fullMark: 100,
-    },
-    {
-      property: "Density",
-      value: Math.min((getPropertyValue("density") || 0) / 100, 100),
-      fullMark: 100,
-    },
-  ];
-
   // Check if it's a composite material
   const isCompositeMaterial = material.isComposite;
+
+  // Build tabs list
+  const tabsList = [
+    { id: "overview", label: "Overview" },
+    { id: "physical", label: "Physical" },
+    { id: "properties", label: "Properties" },
+    { id: "states", label: "States" },
+    { id: "transformations", label: "Transformations" },
+  ];
+
+  // Add composition tab if it's a composite material
+  if (isCompositeMaterial) {
+    tabsList.push({ id: "composition", label: "Composition" });
+  }
 
   return (
     <Sheet {...props}>
@@ -175,7 +197,7 @@ export function MaterialDetailSheet({
                     backgroundColor: material.colorHex || undefined,
                   }}
                 >
-                  {material.category}
+                  {material.category.toLowerCase()}
                 </Badge>
                 {material.isMagical && (
                   <Badge variant="secondary">
@@ -205,416 +227,93 @@ export function MaterialDetailSheet({
           </SheetDescription>
         </SheetHeader>
 
-        <Tabs
-          defaultValue={activeTab}
-          onValueChange={setActiveTab}
-          className="mt-6 flex "
-        >
-          <TabsList>
-            <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="transformations">
-              Transformations
-              {(sourceTransformations.length > 0 ||
-                targetTransformations.length > 0) && (
-                <Badge variant="secondary" className="ml-2">
-                  {sourceTransformations.length + targetTransformations.length}
-                </Badge>
-              )}
-            </TabsTrigger>
-            <TabsTrigger value="composition" disabled={!isCompositeMaterial}>
-              Composition
-            </TabsTrigger>
-          </TabsList>
+        <Form {...form}>
+          <form className="mt-6">
+            <Tabs
+              defaultValue="overview"
+              value={activeTab}
+              onValueChange={setActiveTab}
+            >
+              <TabsList className="grid w-full grid-cols-5">
+                {tabsList.map((tab) => (
+                  <TabsTrigger key={tab.id} value={tab.id}>
+                    {tab.label}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
 
-          {/* Overview Tab */}
-          <TabsContent value="overview" className="space-y-6">
-            <Separator />
+              {/* Overview Tab - Basic Information */}
+              <TabsContent value="overview">
+                <BasicInfoTab form={form} isReadOnly={true} />
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="flex items-center">
-                <BarChart2 className="mr-2 h-5 w-5 text-muted-foreground" />
-                <span className="font-medium">Hardness:</span>
-                <span className="ml-2">
-                  {material.hardness || "Not specified"}
-                </span>
-              </div>
-
-              <div className="flex items-center">
-                <Weight className="mr-2 h-5 w-5 text-muted-foreground" />
-                <span className="font-medium">Density:</span>
-                <span className="ml-2">
-                  {material.density
-                    ? `${material.density} kg/m³`
-                    : "Not specified"}
-                </span>
-              </div>
-
-              <div className="flex items-center">
-                <DollarSign className="mr-2 h-5 w-5 text-muted-foreground" />
-                <span className="font-medium">Value Modifier:</span>
-                <span className="ml-2">
-                  ×{material.valueModifier.toFixed(2)}
-                </span>
-              </div>
-
-              <div className="flex items-center">
-                <Thermometer className="mr-2 h-5 w-5 text-muted-foreground" />
-                <span className="font-medium">Melting Point:</span>
-                <span className="ml-2">
-                  {material.meltingPoint
-                    ? `${material.meltingPoint}°C`
-                    : "Not specified"}
-                </span>
-              </div>
-
-              <div className="flex items-center">
-                <Flame className="mr-2 h-5 w-5 text-muted-foreground" />
-                <span className="font-medium">Ignite Point:</span>
-                <span className="ml-2">
-                  {material.ignitePoint
-                    ? `${material.ignitePoint}°C`
-                    : "Not specified"}
-                </span>
-              </div>
-
-              <div className="flex items-center">
-                <Droplet className="mr-2 h-5 w-5 text-muted-foreground" />
-                <span className="font-medium">Sharpness:</span>
-                <span className="ml-2">
-                  {material.sharpness || "Not specified"}
-                </span>
-              </div>
-            </div>
-
-            {/* Durability bar */}
-            {material.durability !== undefined && (
-              <div className="w-full space-y-2">
-                <h3 className="font-medium mb-1">Durability</h3>
-                <div className="w-full bg-muted h-2 rounded-full overflow-hidden">
-                  <div
-                    className={`h-full ${
-                      material.durability > 75
-                        ? "bg-emerald-500"
+                {/* Durability bar */}
+                {material.durability !== undefined && (
+                  <div className="w-full space-y-2 mt-4">
+                    <h3 className="font-medium mb-1">Durability</h3>
+                    <div className="w-full bg-muted h-2 rounded-full overflow-hidden">
+                      <div
+                        className={`h-full ${
+                          material.durability > 75
+                            ? "bg-emerald-500"
+                            : material.durability > 50
+                            ? "bg-amber-500"
+                            : material.durability > 25
+                            ? "bg-orange-500"
+                            : "bg-rose-500"
+                        }`}
+                        style={{ width: `${material.durability}%` }}
+                      ></div>
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      {material.durability}/100
+                      {material.durability > 90
+                        ? " (Exceptional)"
+                        : material.durability > 75
+                        ? " (Excellent)"
                         : material.durability > 50
-                        ? "bg-amber-500"
+                        ? " (Good)"
                         : material.durability > 25
-                        ? "bg-orange-500"
-                        : "bg-rose-500"
-                    }`}
-                    style={{ width: `${material.durability}%` }}
-                  ></div>
-                </div>
-                <p className="text-sm text-muted-foreground">
-                  {material.durability}/100
-                  {material.durability > 90
-                    ? " (Exceptional)"
-                    : material.durability > 75
-                    ? " (Excellent)"
-                    : material.durability > 50
-                    ? " (Good)"
-                    : material.durability > 25
-                    ? " (Poor)"
-                    : " (Very Poor)"}
-                </p>
-              </div>
-            )}
-
-            {/* Properties Radar Chart */}
-            <div className="mt-4">
-              <h3 className="font-medium mb-2">Material Properties:</h3>
-              <div className="border rounded-md p-4 bg-card">
-                <ResponsiveContainer width="100%" height={300}>
-                  <RadarChart
-                    cx="50%"
-                    cy="50%"
-                    outerRadius="80%"
-                    data={radarData}
-                  >
-                    <PolarGrid />
-                    <PolarAngleAxis dataKey="property" />
-                    <Radar
-                      name={material.name}
-                      dataKey="value"
-                      stroke="#8884d8"
-                      fill="#8884d8"
-                      fillOpacity={0.6}
-                    />
-                  </RadarChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-
-            {/* Material States */}
-            {material.states && material.states.size > 0 && (
-              <div>
-                <h3 className="font-medium mb-2">Material States:</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {Array.from(material.states.entries()).map(
-                    ([state, stateData]) => (
-                      <div key={state} className="border rounded-md p-3">
-                        <div className="flex items-center">
-                          <div
-                            className="w-3 h-3 rounded-full mr-2"
-                            style={{
-                              backgroundColor: stateData.color || "#888888",
-                            }}
-                          ></div>
-                          <span className="font-medium capitalize">
-                            {state.toLowerCase()}
-                          </span>
-                        </div>
-                        {stateData.description && (
-                          <p className="text-sm text-muted-foreground mt-1">
-                            {stateData.description}
-                          </p>
-                        )}
-                      </div>
-                    )
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Additional Properties */}
-            {material.properties && material.properties.size > 0 && (
-              <div>
-                <h3 className="font-medium mb-2">Additional Properties:</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {Array.from(material.properties.entries()).map(
-                    ([key, value]) => (
-                      <div key={key} className="border rounded-md p-3">
-                        <span className="font-medium">{key}:</span> {value}
-                      </div>
-                    )
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Source Information */}
-            {(material.sourceLocation ||
-              material.sourceCreature ||
-              material.sourcePlant) && (
-              <div>
-                <h3 className="font-medium mb-2">Source Information:</h3>
-                <div className="space-y-2">
-                  {material.sourceLocation && (
-                    <div className="flex items-start">
-                      <span className="font-medium min-w-24">Location:</span>
-                      <span>{material.sourceLocation}</span>
-                    </div>
-                  )}
-                  {material.sourceCreature && (
-                    <div className="flex items-start">
-                      <span className="font-medium min-w-24">Creature:</span>
-                      <span>{material.sourceCreature}</span>
-                    </div>
-                  )}
-                  {material.sourcePlant && (
-                    <div className="flex items-start">
-                      <span className="font-medium min-w-24">Plant:</span>
-                      <span>{material.sourcePlant}</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Created date */}
-            <div className="text-xs text-muted-foreground text-right">
-              Created: {material.createdAt.toLocaleDateString()}
-            </div>
-          </TabsContent>
-
-          {/* Transformations Tab */}
-          <TabsContent value="transformations" className="space-y-6">
-            <Separator />
-
-            <div className="flex justify-between items-center">
-              <h3 className="text-lg font-medium">Material Transformations</h3>
-
-              {/* Add New Transformation Button */}
-              <Dialog>
-                <DialogTrigger asChild>
-                  <Button variant="outline" size="sm">
-                    <Plus className="mr-2 h-4 w-4" />
-                    Add Transformation
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="sm:max-w-md">
-                  <DialogHeader>
-                    <DialogTitle>Create New Transformation</DialogTitle>
-                    <DialogDescription>
-                      Define a process to transform this material into another
-                    </DialogDescription>
-                  </DialogHeader>
-
-                  {/* Add transformation form would go here */}
-                  {/* We would need to implement a TransformationForm component */}
-
-                  <DialogFooter className="mt-4">
-                    <Button type="button" variant="outline">
-                      Cancel
-                    </Button>
-                    <Button type="submit">Create Transformation</Button>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
-            </div>
-
-            {isLoadingTransformations ? (
-              <div className="flex justify-center py-8">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-              </div>
-            ) : sourceTransformations.length === 0 &&
-              targetTransformations.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                <p>No transformations available for this material.</p>
-                <p className="text-sm mt-2">
-                  Transformations define how materials can be converted from one
-                  form to another.
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-6">
-                {sourceTransformations.length > 0 && (
-                  <div>
-                    <h3 className="text-lg font-medium flex items-center gap-2">
-                      <Focus className="h-5 w-5" />
-                      Source Transformations
-                    </h3>
-                    <p className="text-sm text-muted-foreground mb-4">
-                      Processes that use this material as an input
+                        ? " (Poor)"
+                        : " (Very Poor)"}
                     </p>
-
-                    <MaterialTransformationPanel
-                      transformations={sourceTransformations}
-                      direction="source"
-                      onTransform={onTransform}
-                    />
                   </div>
                 )}
+              </TabsContent>
 
-                {targetTransformations.length > 0 && (
-                  <div>
-                    <h3 className="text-lg font-medium flex items-center gap-2 mt-6">
-                      <Flame className="h-5 w-5" />
-                      Target Transformations
-                    </h3>
-                    <p className="text-sm text-muted-foreground mb-4">
-                      Processes that create this material as an output
-                    </p>
+              {/* Physical Properties Tab */}
+              <TabsContent value="physical">
+                <PhysicalPropertiesTab form={form} isReadOnly={true} />
+              </TabsContent>
 
-                    <MaterialTransformationPanel
-                      transformations={targetTransformations}
-                      direction="target"
-                      onTransform={onTransform}
-                    />
-                  </div>
-                )}
-              </div>
-            )}
-          </TabsContent>
+              {/* Custom Properties Tab */}
+              <TabsContent value="properties">
+                <CustomPropertiesTab form={form} isReadOnly={true} />
+              </TabsContent>
 
-          {/* Composition Tab (only for composite materials) */}
-          {isCompositeMaterial && (
-            <TabsContent value="composition" className="space-y-6">
-              <Separator />
+              {/* Material States Tab */}
+              <TabsContent value="states">
+                <StatesTab form={form} isReadOnly={true} />
+              </TabsContent>
 
-              <div>
-                <h3 className="text-lg font-medium mb-4">
-                  Material Composition
-                </h3>
+              {/* Transformations Tab */}
+              <TabsContent value="transformations">
+                <TransformationsTab
+                  material={material}
+                  onTransform={onTransform}
+                  onCreateTransformation={onCreateTransformation}
+                  isReadOnly={true}
+                />
+              </TabsContent>
 
-                <div className="space-y-4">
-                  {/* Display components */}
-                  {(material as CompositeMaterial).components?.map(
-                    (component, index) => (
-                      <div key={index} className="border rounded-md p-4">
-                        <div className="flex justify-between items-center mb-2">
-                          <div className="flex items-center gap-2">
-                            <div
-                              className="w-4 h-4 rounded-full"
-                              style={{
-                                backgroundColor:
-                                  typeof component.material === "string"
-                                    ? "#888888"
-                                    : component.material.colorHex || "#888888",
-                              }}
-                            />
-                            <span className="font-medium">
-                              {typeof component.material === "string"
-                                ? component.material
-                                : component.material.name}
-                            </span>
-                            {component.isPrimary && (
-                              <Badge variant="default" className="text-xs">
-                                Primary
-                              </Badge>
-                            )}
-                          </div>
-                          <Badge variant="outline">
-                            {component.percentage.toFixed(1)}%
-                          </Badge>
-                        </div>
-
-                        {typeof component.material !== "string" && (
-                          <div className="text-sm text-muted-foreground">
-                            <span>
-                              {component.material.category} | Hardness:{" "}
-                              {component.material.hardness || "N/A"} |
-                              Durability:{" "}
-                              {component.material.durability || "N/A"}
-                            </span>
-                          </div>
-                        )}
-
-                        {/* Show property influences */}
-                        {component.propertyInfluence &&
-                          Object.keys(component.propertyInfluence).length >
-                            0 && (
-                            <div className="mt-2 text-xs">
-                              <p className="font-medium">
-                                Property influences:
-                              </p>
-                              <div className="grid grid-cols-2 gap-x-4 mt-1">
-                                {Object.entries(
-                                  component.propertyInfluence
-                                ).map(([property, value]) => (
-                                  <div
-                                    key={property}
-                                    className="flex justify-between"
-                                  >
-                                    <span className="capitalize">
-                                      {property}
-                                    </span>
-                                    <span>
-                                      {value > 1
-                                        ? `+${((value - 1) * 100).toFixed(0)}%`
-                                        : `-${((1 - value) * 100).toFixed(0)}%`}
-                                    </span>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                      </div>
-                    )
-                  )}
-                </div>
-
-                <div className="mt-4 p-4 bg-muted rounded-md">
-                  <p className="text-sm">
-                    <span className="font-medium">Composition effect:</span>{" "}
-                    This composite material combines the properties of its
-                    components, with the primary component defining the base
-                    characteristics.
-                  </p>
-                </div>
-              </div>
-            </TabsContent>
-          )}
-        </Tabs>
+              {/* Composition Tab (only for composite materials) */}
+              {isCompositeMaterial && (
+                <TabsContent value="composition">
+                  <CompositionTab material={material} isReadOnly={true} />
+                </TabsContent>
+              )}
+            </Tabs>
+          </form>
+        </Form>
 
         <SheetFooter className="flex gap-2 pt-6 border-t mt-6">
           <Button onClick={onEdit} variant="outline">

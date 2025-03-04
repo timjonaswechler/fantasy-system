@@ -38,8 +38,8 @@ export function getCommonPinningStyles<TData>({
       ? isLastLeftPinnedColumn
         ? "-4px 0 4px -4px hsl(var(--border)) inset"
         : isFirstRightPinnedColumn
-          ? "4px 0 4px -4px hsl(var(--border)) inset"
-          : undefined
+        ? "4px 0 4px -4px hsl(var(--border)) inset"
+        : undefined
       : undefined,
     left: isPinned === "left" ? `${column.getStart("left")}px` : undefined,
     right: isPinned === "right" ? `${column.getAfter("right")}px` : undefined,
@@ -62,7 +62,7 @@ export function getCommonPinningStyles<TData>({
  * @returns The default FilterOperator for the given column type.
  */
 export function getDefaultFilterOperator(
-  columnType: ColumnType,
+  columnType: ColumnType
 ): FilterOperator {
   if (columnType === "text") {
     return "iLike";
@@ -110,7 +110,7 @@ export function getFilterOperators(columnType: ColumnType) {
  * @returns A new array containing only the valid filters.
  */
 export function getValidFilters<TData>(
-  filters: Filter<TData>[],
+  filters: Filter<TData>[]
 ): Filter<TData>[] {
   return filters.filter(
     (filter) =>
@@ -120,6 +120,6 @@ export function getValidFilters<TData>(
         ? filter.value.length > 0
         : filter.value !== "" &&
           filter.value !== null &&
-          filter.value !== undefined),
+          filter.value !== undefined)
   );
 }
