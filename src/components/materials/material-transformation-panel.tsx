@@ -113,7 +113,7 @@ export function MaterialTransformationPanel({
       case TimeUnit.DAYS:
         return time === 1 ? "1 day" : `${time} days`;
       default:
-        return `${time} ${unit.toLowerCase()}`;
+        return `${time} ${String(unit).toLowerCase()}`;
     }
   };
 

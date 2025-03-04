@@ -1,6 +1,7 @@
+// src/components/materials/material-update-sheet.tsx
 "use client";
 
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm, useFieldArray } from "react-hook-form";
 import * as z from "zod";
@@ -38,6 +39,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Badge } from "@/components/ui/badge";
 import {
   Tooltip,
   TooltipContent,
@@ -47,6 +49,13 @@ import {
 
 import { IMaterial, MaterialCategory, MaterialState } from "@/types/material";
 import { updateMaterial } from "@/actions/materials";
+
+import {
+  getSourceTransformationsForMaterial,
+  getTargetTransformationsForMaterial,
+} from "@/actions/material-transformations";
+import { MaterialTransformationPanel } from "./material-transformation-panel";
+import { CompositeMaterial } from "@/types/material-composite";
 
 // Form validation schema
 const materialUpdateSchema = z.object({
@@ -112,6 +121,18 @@ const materialUpdateSchema = z.object({
       })
     )
     .optional(),
+
+  // Composite-specific fields (will be validated conditionally)
+  compositeComponents: z
+    .array(
+      z.object({
+        materialId: z.string(),
+        percentage: z.number().min(0.1).max(100),
+        isPrimary: z.boolean().default(false),
+        propertyInfluence: z.record(z.string(), z.number()).optional(),
+      })
+    )
+    .optional(),
 });
 
 type UpdateMaterialSchema = z.infer<typeof materialUpdateSchema>;
@@ -119,13 +140,24 @@ type UpdateMaterialSchema = z.infer<typeof materialUpdateSchema>;
 interface MaterialUpdateSheetProps
   extends React.ComponentPropsWithRef<typeof Sheet> {
   material: IMaterial | null;
+  availableMaterials?: IMaterial[]; // For composite editing
+  onSuccess?: () => void;
 }
 
 export function MaterialUpdateSheet({
   material,
+  availableMaterials = [],
+  onSuccess,
   ...props
 }: MaterialUpdateSheetProps) {
   const [isUpdatePending, startUpdateTransition] = React.useTransition();
+  const [activeTab, setActiveTab] = useState("basic");
+
+  // States for transformations
+  const [sourceTransformations, setSourceTransformations] = useState([]);
+  const [targetTransformations, setTargetTransformations] = useState([]);
+  const [isLoadingTransformations, setIsLoadingTransformations] =
+    useState(false);
 
   // Initialize form
   const form = useForm<UpdateMaterialSchema>({
@@ -161,6 +193,7 @@ export function MaterialUpdateSheet({
           color: "",
         },
       ],
+      compositeComponents: [],
     },
   });
 
@@ -185,6 +218,43 @@ export function MaterialUpdateSheet({
     name: "states",
   });
 
+  // Setup field array for composite components if applicable
+  const {
+    fields: compositeComponentFields,
+    append: appendCompositeComponent,
+    remove: removeCompositeComponent,
+    replace: replaceCompositeComponents,
+  } = useFieldArray({
+    control: form.control,
+    name: "compositeComponents",
+  });
+
+  // Load transformations when material changes
+  useEffect(() => {
+    const loadTransformations = async () => {
+      if (!material) return;
+
+      setIsLoadingTransformations(true);
+      try {
+        const sourceResult = await getSourceTransformationsForMaterial(
+          material.id
+        );
+        setSourceTransformations(sourceResult);
+
+        const targetResult = await getTargetTransformationsForMaterial(
+          material.id
+        );
+        setTargetTransformations(targetResult);
+      } catch (error) {
+        console.error("Error loading transformations:", error);
+      } finally {
+        setIsLoadingTransformations(false);
+      }
+    };
+
+    loadTransformations();
+  }, [material]);
+
   // Update form values when material changes
   useEffect(() => {
     if (material) {
@@ -204,6 +274,20 @@ export function MaterialUpdateSheet({
           color: data.color || "",
         })
       );
+
+      // Prepare composite components if applicable
+      const componentsArray =
+        material.isComposite && "components" in material
+          ? (material as CompositeMaterial).components.map((component) => ({
+              materialId:
+                typeof component.material === "string"
+                  ? component.material
+                  : component.material.id,
+              percentage: component.percentage,
+              isPrimary: component.isPrimary,
+              propertyInfluence: component.propertyInfluence || {},
+            }))
+          : [];
 
       // Set all form values
       form.reset({
@@ -240,6 +324,7 @@ export function MaterialUpdateSheet({
                   color: "",
                 },
               ],
+        compositeComponents: componentsArray,
       });
 
       // Update field arrays
@@ -255,8 +340,19 @@ export function MaterialUpdateSheet({
               },
             ]
       );
+
+      // Update composite components if applicable
+      if (material.isComposite) {
+        replaceCompositeComponents(componentsArray);
+      }
     }
-  }, [material, form, replaceProperties, replaceStates]);
+  }, [
+    material,
+    form,
+    replaceProperties,
+    replaceStates,
+    replaceCompositeComponents,
+  ]);
 
   function onSubmit(data: UpdateMaterialSchema) {
     startUpdateTransition(async () => {
@@ -277,6 +373,7 @@ export function MaterialUpdateSheet({
         if (result.success) {
           props.onOpenChange?.(false);
           toast.success("Material updated successfully");
+          onSuccess?.();
         }
       } catch (error) {
         console.error("Error updating material:", error);
@@ -286,6 +383,12 @@ export function MaterialUpdateSheet({
   }
 
   if (!material) return null;
+
+  // Determine if it's a composite material
+  const isCompositeMaterial = material.isComposite;
+
+  // Extra tab for composite materials
+  const showCompositeTab = isCompositeMaterial && availableMaterials.length > 0;
 
   return (
     <Sheet {...props}>
@@ -302,12 +405,20 @@ export function MaterialUpdateSheet({
             onSubmit={form.handleSubmit(onSubmit)}
             className="flex flex-col gap-5"
           >
-            <Tabs defaultValue="basic" className="w-full">
-              <TabsList className="grid grid-cols-4 mb-4">
+            <Tabs
+              defaultValue="basic"
+              value={activeTab}
+              onValueChange={setActiveTab}
+              className="w-full"
+            >
+              <TabsList className={`mb-4`}>
                 <TabsTrigger value="basic">Basic</TabsTrigger>
                 <TabsTrigger value="physical">Physical</TabsTrigger>
                 <TabsTrigger value="properties">Properties</TabsTrigger>
                 <TabsTrigger value="states">States</TabsTrigger>
+                {showCompositeTab && (
+                  <TabsTrigger value="composite">Composite</TabsTrigger>
+                )}
               </TabsList>
 
               {/* Basic Tab */}
@@ -899,6 +1010,202 @@ export function MaterialUpdateSheet({
                   ))}
                 </div>
               </TabsContent>
+
+              {/* Composite Materials Tab (only shown for composite materials) */}
+              {showCompositeTab && (
+                <TabsContent value="composite" className="space-y-4">
+                  <div className="flex justify-between items-center">
+                    <h3 className="text-lg font-medium">
+                      Composite Components
+                    </h3>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        appendCompositeComponent({
+                          materialId: "",
+                          percentage: 10,
+                          isPrimary: false,
+                          propertyInfluence: {},
+                        })
+                      }
+                    >
+                      <Plus className="mr-2 h-4 w-4" />
+                      Add Component
+                    </Button>
+                  </div>
+
+                  {compositeComponentFields.length === 0 ? (
+                    <div className="text-center py-4 text-muted-foreground">
+                      No components added. This doesn't appear to be a composite
+                      material.
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {compositeComponentFields.map((field, index) => (
+                        <div key={field.id} className="border rounded-md p-4">
+                          <div className="flex justify-between items-center mb-4">
+                            <FormField
+                              control={form.control}
+                              name={`compositeComponents.${index}.materialId`}
+                              render={({ field }) => (
+                                <FormItem className="flex-1">
+                                  <FormLabel>Material</FormLabel>
+                                  <Select
+                                    onValueChange={field.onChange}
+                                    value={field.value}
+                                  >
+                                    <FormControl>
+                                      <SelectTrigger>
+                                        <SelectValue placeholder="Select material" />
+                                      </SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                      {availableMaterials
+                                        .filter((m) => !m.isComposite) // Prevent nesting composites
+                                        .map((material) => (
+                                          <SelectItem
+                                            key={material.id}
+                                            value={material.id}
+                                          >
+                                            {material.name}
+                                          </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                  </Select>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => removeCompositeComponent(index)}
+                              className="ml-2"
+                              disabled={compositeComponentFields.length <= 1}
+                            >
+                              <Trash className="h-4 w-4" />
+                              <span className="sr-only">Remove</span>
+                            </Button>
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <FormField
+                              control={form.control}
+                              name={`compositeComponents.${index}.percentage`}
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Percentage</FormLabel>
+                                  <FormControl>
+                                    <Input
+                                      type="number"
+                                      min="0.1"
+                                      max="100"
+                                      step="0.1"
+                                      {...field}
+                                    />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+
+                            <FormField
+                              control={form.control}
+                              name={`compositeComponents.${index}.isPrimary`}
+                              render={({ field }) => (
+                                <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
+                                  <FormControl>
+                                    <Checkbox
+                                      checked={field.value}
+                                      onCheckedChange={(checked) => {
+                                        // If checked, uncheck all other components
+                                        if (checked) {
+                                          compositeComponentFields.forEach(
+                                            (_, i) => {
+                                              if (i !== index) {
+                                                form.setValue(
+                                                  `compositeComponents.${i}.isPrimary`,
+                                                  false
+                                                );
+                                              }
+                                            }
+                                          );
+                                        }
+                                        field.onChange(checked);
+                                      }}
+                                    />
+                                  </FormControl>
+                                  <div className="space-y-1 leading-none">
+                                    <FormLabel>Primary Component</FormLabel>
+                                    <FormDescription>
+                                      Defines the base characteristics
+                                    </FormDescription>
+                                  </div>
+                                </FormItem>
+                              )}
+                            />
+                          </div>
+
+                          {/* Display info about the selected material */}
+                          {field.materialId && (
+                            <div className="mt-4 text-sm text-muted-foreground">
+                              {(() => {
+                                const material = availableMaterials.find(
+                                  (m) => m.id === field.materialId
+                                );
+
+                                if (!material) return <p>Material not found</p>;
+
+                                return (
+                                  <div>
+                                    <div className="flex items-center gap-2">
+                                      <div
+                                        className="w-3 h-3 rounded-full"
+                                        style={{
+                                          backgroundColor:
+                                            material.colorHex || "#888888",
+                                        }}
+                                      />
+                                      <span>
+                                        {material.category} | Hardness:{" "}
+                                        {material.hardness || "N/A"} |
+                                        Durability:{" "}
+                                        {material.durability || "N/A"}
+                                      </span>
+                                    </div>
+                                  </div>
+                                );
+                              })()}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Display the total percentage */}
+                  {compositeComponentFields.length > 0 && (
+                    <div className="flex justify-between items-center text-sm mt-4">
+                      <span>Total percentage:</span>
+                      <Badge variant={"default"}>
+                        {(
+                          form
+                            .getValues()
+                            .compositeComponents?.reduce(
+                              (sum, comp) => sum + (comp.percentage || 0),
+                              0
+                            ) || 0
+                        ).toFixed(1)}
+                        %
+                      </Badge>
+                    </div>
+                  )}
+                </TabsContent>
+              )}
             </Tabs>
 
             <SheetFooter className="gap-2 pt-6">

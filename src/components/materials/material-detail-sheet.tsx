@@ -1,3 +1,4 @@
+// src/components/materials/material-detail-sheet.tsx
 "use client";
 
 import React, { useEffect, useState } from "react";
@@ -9,7 +10,6 @@ import {
   SheetTitle,
   SheetClose,
   SheetFooter,
-  SheetTrigger,
 } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -26,8 +26,7 @@ import {
   Trash,
   Focus,
   Layers,
-  ArrowRight,
-  Hammer,
+  Plus,
 } from "lucide-react";
 import { IMaterial, MaterialCategory, MaterialState } from "@/types/material";
 import {
@@ -37,34 +36,55 @@ import {
   PolarAngleAxis,
   ResponsiveContainer,
 } from "recharts";
-import { MaterialTransformation } from "@/types/material-transformation";
+import {
+  MaterialTransformation,
+  TransformationType,
+  TransformationFormData,
+  TransformationResult,
+} from "@/types/material-transformation";
 import { CompositeMaterial } from "@/types/material-composite";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 
 import {
   getSourceTransformationsForMaterial,
   getTargetTransformationsForMaterial,
+  createTransformation,
 } from "@/actions/material-transformations";
 import { MaterialTransformationPanel } from "./material-transformation-panel";
+import { CompositeMaterialDesigner } from "./composite-material-designer";
 
 interface MaterialDetailSheetProps
   extends React.ComponentPropsWithRef<typeof Sheet> {
   material: IMaterial | null;
+  availableMaterials?: IMaterial[]; // For composite material designer
   onEdit?: () => void;
   onDelete?: () => void;
-  onTransform?: (result: any) => void;
+  onTransform?: (result: TransformationResult) => void;
+  onCreateTransformation?: (data: TransformationFormData) => void;
 }
 
 export function MaterialDetailSheet({
   material,
+  availableMaterials = [],
   onEdit,
   onDelete,
   onTransform,
+  onCreateTransformation,
   ...props
 }: MaterialDetailSheetProps) {
-  if (!material) return null;
+  const [activeTab, setActiveTab] = useState("overview");
+  const [isCompositeDesignerOpen, setIsCompositeDesignerOpen] = useState(false);
 
-  // States für Transformationen
+  // States for transformations
   const [sourceTransformations, setSourceTransformations] = useState<
     MaterialTransformation[]
   >([]);
@@ -74,7 +94,7 @@ export function MaterialDetailSheet({
   const [isLoadingTransformations, setIsLoadingTransformations] =
     useState(false);
 
-  // Transformationen laden, wenn Material sich ändert
+  // Load transformations when material changes
   useEffect(() => {
     const loadTransformations = async () => {
       if (!material) return;
@@ -99,6 +119,8 @@ export function MaterialDetailSheet({
 
     loadTransformations();
   }, [material]);
+
+  if (!material) return null;
 
   // Prepare data for radar chart
   const getPropertyValue = (propertyName: string): number => {
@@ -135,7 +157,7 @@ export function MaterialDetailSheet({
     },
   ];
 
-  // Überprüfen, ob es ein Verbundmaterial ist
+  // Check if it's a composite material
   const isCompositeMaterial = material.isComposite;
 
   return (
@@ -183,8 +205,12 @@ export function MaterialDetailSheet({
           </SheetDescription>
         </SheetHeader>
 
-        <Tabs defaultValue="overview" className="mt-6">
-          <TabsList className="grid w-full grid-cols-3">
+        <Tabs
+          defaultValue={activeTab}
+          onValueChange={setActiveTab}
+          className="mt-6 flex "
+        >
+          <TabsList>
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="transformations">
               Transformations
@@ -195,9 +221,9 @@ export function MaterialDetailSheet({
                 </Badge>
               )}
             </TabsTrigger>
-            {isCompositeMaterial && (
-              <TabsTrigger value="composition">Composition</TabsTrigger>
-            )}
+            <TabsTrigger value="composition" disabled={!isCompositeMaterial}>
+              Composition
+            </TabsTrigger>
           </TabsList>
 
           {/* Overview Tab */}
@@ -394,39 +420,6 @@ export function MaterialDetailSheet({
               </div>
             )}
 
-            {/* Physical Properties */}
-            <div>
-              <h3 className="font-medium mb-2">Physical Properties:</h3>
-              <div className="space-y-2">
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="border rounded-md p-3">
-                    <span className="font-medium">Impact Yield:</span>
-                    <span className="block text-sm">
-                      {material.impactYield || "Not specified"}
-                    </span>
-                  </div>
-                  <div className="border rounded-md p-3">
-                    <span className="font-medium">Impact Fracture:</span>
-                    <span className="block text-sm">
-                      {material.impactFracture || "Not specified"}
-                    </span>
-                  </div>
-                  <div className="border rounded-md p-3">
-                    <span className="font-medium">Shear Yield:</span>
-                    <span className="block text-sm">
-                      {material.shearYield || "Not specified"}
-                    </span>
-                  </div>
-                  <div className="border rounded-md p-3">
-                    <span className="font-medium">Shear Fracture:</span>
-                    <span className="block text-sm">
-                      {material.shearFracture || "Not specified"}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
             {/* Created date */}
             <div className="text-xs text-muted-foreground text-right">
               Created: {material.createdAt.toLocaleDateString()}
@@ -436,6 +429,38 @@ export function MaterialDetailSheet({
           {/* Transformations Tab */}
           <TabsContent value="transformations" className="space-y-6">
             <Separator />
+
+            <div className="flex justify-between items-center">
+              <h3 className="text-lg font-medium">Material Transformations</h3>
+
+              {/* Add New Transformation Button */}
+              <Dialog>
+                <DialogTrigger asChild>
+                  <Button variant="outline" size="sm">
+                    <Plus className="mr-2 h-4 w-4" />
+                    Add Transformation
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-md">
+                  <DialogHeader>
+                    <DialogTitle>Create New Transformation</DialogTitle>
+                    <DialogDescription>
+                      Define a process to transform this material into another
+                    </DialogDescription>
+                  </DialogHeader>
+
+                  {/* Add transformation form would go here */}
+                  {/* We would need to implement a TransformationForm component */}
+
+                  <DialogFooter className="mt-4">
+                    <Button type="button" variant="outline">
+                      Cancel
+                    </Button>
+                    <Button type="submit">Create Transformation</Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            </div>
 
             {isLoadingTransformations ? (
               <div className="flex justify-center py-8">
@@ -473,7 +498,7 @@ export function MaterialDetailSheet({
                 {targetTransformations.length > 0 && (
                   <div>
                     <h3 className="text-lg font-medium flex items-center gap-2 mt-6">
-                      <Hammer className="h-5 w-5" />
+                      <Flame className="h-5 w-5" />
                       Target Transformations
                     </h3>
                     <p className="text-sm text-muted-foreground mb-4">
@@ -491,7 +516,7 @@ export function MaterialDetailSheet({
             )}
           </TabsContent>
 
-          {/* Composition Tab (nur für Verbundmaterialien) */}
+          {/* Composition Tab (only for composite materials) */}
           {isCompositeMaterial && (
             <TabsContent value="composition" className="space-y-6">
               <Separator />
@@ -502,7 +527,7 @@ export function MaterialDetailSheet({
                 </h3>
 
                 <div className="space-y-4">
-                  {/* Komponenten anzeigen */}
+                  {/* Display components */}
                   {(material as CompositeMaterial).components?.map(
                     (component, index) => (
                       <div key={index} className="border rounded-md p-4">
@@ -544,7 +569,7 @@ export function MaterialDetailSheet({
                           </div>
                         )}
 
-                        {/* Eigenschaftseinflüsse anzeigen */}
+                        {/* Show property influences */}
                         {component.propertyInfluence &&
                           Object.keys(component.propertyInfluence).length >
                             0 && (
