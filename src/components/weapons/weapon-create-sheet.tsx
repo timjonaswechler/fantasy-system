@@ -195,7 +195,6 @@ export function WeaponCreateSheet({
         currentCategory === WeaponCategory.BOWS ||
         currentCategory === WeaponCategory.CROSSBOWS ||
         currentCategory === WeaponCategory.FIREARMS ||
-        currentCategory === WeaponCategory.THROWING_WEAPONS ||
         currentCategory === WeaponCategory.THROWABLE_ITEMS
       ) {
         form.setValue("category", WeaponCategory.SWORDS);
@@ -209,14 +208,12 @@ export function WeaponCreateSheet({
       ) {
         form.setValue("category", WeaponCategory.BOWS);
       }
-    } else if (newType === WeaponType.THROWING) {
-      form.setValue("category", WeaponCategory.THROWING_WEAPONS);
     }
   };
 
   return (
     <Sheet {...props}>
-      <SheetContent className="w-full sm:max-w-2xl overflow-y-auto">
+      <SheetContent className="w-3/4 p-4 sm:p-6">
         <SheetHeader>
           <SheetTitle>Create New Weapon</SheetTitle>
           <SheetDescription>
@@ -362,11 +359,6 @@ export function WeaponCreateSheet({
                           {/* Throwing weapon categories */}
                           {form.watch("type") === WeaponType.THROWING && (
                             <>
-                              <SelectItem
-                                value={WeaponCategory.THROWING_WEAPONS}
-                              >
-                                Throwing Weapons
-                              </SelectItem>
                               <SelectItem
                                 value={WeaponCategory.THROWABLE_ITEMS}
                               >
