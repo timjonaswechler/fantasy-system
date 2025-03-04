@@ -26,6 +26,8 @@ import { WeaponUpdateSheet } from "./weapon-update-sheet";
 import { WeaponDetailSheet } from "./weapon-detail-sheet";
 import { WeaponCreateSheet } from "./weapon-create-sheet";
 import { WeaponType, WeaponCategory, GraspType } from "@/types/weapon";
+import { Description } from "@radix-ui/react-dialog";
+import { Weight } from "lucide-react";
 
 interface WeaponsTableProps {
   weapons: IWeapon[];
@@ -148,7 +150,15 @@ export function WeaponsTable({ weapons }: WeaponsTableProps) {
     []
   );
   const [columnVisibility, setColumnVisibility] =
-    React.useState<VisibilityState>({});
+    React.useState<VisibilityState>({
+      description: false,
+      material: false,
+      imageUrl: false,
+      weight: false,
+      properties: false,
+      durability: false,
+      range: false,
+    });
   const [rowSelection, setRowSelection] = React.useState<RowSelectionState>({});
   const [pagination, setPagination] = React.useState({
     pageIndex: 0,

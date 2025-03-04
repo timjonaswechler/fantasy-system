@@ -84,6 +84,7 @@ export function getColumns({
           </div>
         );
       },
+      enableHiding: false,
     },
     {
       accessorKey: "description",
@@ -99,6 +100,7 @@ export function getColumns({
           </div>
         );
       },
+      enableHiding: true,
     },
     {
       accessorKey: "type",
@@ -122,6 +124,7 @@ export function getColumns({
       filterFn: (row, id, value) => {
         return Array.isArray(value) && value.includes(row.getValue(id));
       },
+      enableHiding: false,
     },
     {
       accessorKey: "category",
@@ -142,6 +145,7 @@ export function getColumns({
       filterFn: (row, id, value) => {
         return Array.isArray(value) && value.includes(row.getValue(id));
       },
+      enableHiding: false,
     },
     {
       accessorKey: "baseDamage",
@@ -197,6 +201,7 @@ export function getColumns({
         const graspTypes = row.original.grasp;
         return value.some((v) => graspTypes.includes(v as GraspType));
       },
+      enableHiding: false,
       size: 30,
     },
     {
@@ -332,6 +337,7 @@ export function getColumns({
         );
       },
       size: 17,
+      enableHiding: false,
     },
   ];
 }
