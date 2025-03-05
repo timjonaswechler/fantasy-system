@@ -20,45 +20,38 @@ END $$;
 
 -- Create the materials table
 CREATE TABLE IF NOT EXISTS materials (
-    id SERIAL PRIMARY KEY,
-    material_id VARCHAR(255) NOT NULL UNIQUE,
-    name VARCHAR(255) NOT NULL,
-    description TEXT,
-    category material_category NOT NULL,
-    
-    -- Physical properties
-    density DECIMAL(10, 2),
-    melting_point INTEGER,
-    boiling_point INTEGER,
-    ignite_point INTEGER,
-    
-    -- Mechanical properties
-    impact_yield INTEGER,
-    impact_fracture INTEGER,
-    shear_yield INTEGER,
-    shear_fracture INTEGER,
-    
-    -- Combat properties  
-    hardness INTEGER,
-    sharpness INTEGER,
-    durability INTEGER,
-    
-    -- Appearance
-    color VARCHAR(50),
-    color_hex VARCHAR(7),
-    
-    -- Special properties
-    is_magical BOOLEAN DEFAULT false,
-    is_rare BOOLEAN DEFAULT false,
-    value_modifier DECIMAL(6, 2) DEFAULT 1.0,
-    
-    -- Source
-    source_location VARCHAR(255),
-    source_creature VARCHAR(255),
-    source_plant VARCHAR(255),
-    
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+  id SERIAL PRIMARY KEY,
+  material_id VARCHAR(255) NOT NULL UNIQUE,
+  name VARCHAR(255) NOT NULL,
+  category VARCHAR(255) NOT NULL,
+  description TEXT,
+  density DECIMAL(10,3),
+  value_modifier DECIMAL(10,2) DEFAULT 1.0,
+  color VARCHAR(7),
+  
+  -- Physical properties
+  impact_yield INTEGER,
+  impact_fracture INTEGER,
+  impact_strain_at_yield INTEGER,
+  shear_yield INTEGER,
+  shear_fracture INTEGER,
+  shear_strain_at_yield INTEGER,
+  
+  -- Thermal properties
+  melting_point INTEGER,
+  boiling_point INTEGER,
+  ignite_point INTEGER,
+  specific_heat DECIMAL(10,3),
+  
+  -- Visual properties
+  display_color VARCHAR(20),
+  
+  -- Flags
+  is_metal BOOLEAN DEFAULT FALSE,
+  is_stone BOOLEAN DEFAULT FALSE,
+  is_gem BOOLEAN DEFAULT FALSE,
+  is_organic BOOLEAN DEFAULT FALSE,
+  is_fabric BOOLEAN DEFAULT FALSE
 );
 
 -- Create index for faster lookup by material_id
@@ -67,11 +60,10 @@ CREATE INDEX IF NOT EXISTS idx_materials_category ON materials(category);
 
 -- Create material_properties table for extensible properties
 CREATE TABLE IF NOT EXISTS material_properties (
-    id SERIAL PRIMARY KEY,
-    material_id INTEGER REFERENCES materials(id) ON DELETE CASCADE,
-    property_name VARCHAR(255) NOT NULL,
-    property_value VARCHAR(255) NOT NULL,
-    UNIQUE (material_id, property_name)
+  id SERIAL PRIMARY KEY,
+  material_id INTEGER REFERENCES materials(id) ON DELETE CASCADE,
+  property_name VARCHAR(255) NOT NULL,
+  property_value TEXT NOT NULL
 );
 
 -- Create material_states table
@@ -84,21 +76,11 @@ CREATE TABLE IF NOT EXISTS material_states (
     UNIQUE (material_id, state_name)
 );
 
--- Create weapon_materials table for linking weapons with materials
-CREATE TABLE IF NOT EXISTS weapon_materials (
-    id SERIAL PRIMARY KEY,
-    weapon_id INTEGER REFERENCES weapons(id) ON DELETE CASCADE,
-    material_id INTEGER REFERENCES materials(id) ON DELETE SET NULL,
-    amount DECIMAL(6, 2),
-    is_primary BOOLEAN DEFAULT false,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
+
 
 -- Create indexes for better performance
 CREATE INDEX IF NOT EXISTS idx_material_properties_material_id ON material_properties(material_id);
 CREATE INDEX IF NOT EXISTS idx_material_states_material_id ON material_states(material_id);
-CREATE INDEX IF NOT EXISTS idx_weapon_materials_weapon_id ON weapon_materials(weapon_id);
-CREATE INDEX IF NOT EXISTS idx_weapon_materials_material_id ON weapon_materials(material_id);
 
 -- Add trigger to update the 'updated_at' timestamp automatically
 DROP TRIGGER IF EXISTS update_materials_modtime ON materials;

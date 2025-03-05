@@ -189,7 +189,7 @@ function loadAllWeaponData() {
 
     const allWeaponsData = [];
     for (const file of weaponFiles) {
-        const filePath = path.join(__dirname, '..', '..', 'src', 'data', 'seed', 'weapons', file);
+        const filePath = path.join(__dirname, '..', '..', 'src', 'db', 'seed', 'weapons', file);
         const data = loadJsonFile(filePath);
         const converted = convertWeaponData(data);
         allWeaponsData.push(...converted);
