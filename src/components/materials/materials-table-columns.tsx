@@ -1,21 +1,18 @@
+// src/components/materials/materials-table-columns.tsx
 "use client";
 
-import {
-  IMaterial,
-  MaterialCategory,
-  getCategoryColor,
-} from "@/types/material";
-import type { DataTableRowAction } from "@/types";
+import { IMaterial } from "@/types/material";
+import type { DataTableRowAction } from "@/types/index";
 import type { ColumnDef } from "@tanstack/react-table";
 import {
   Ellipsis,
+  InspectionPanel,
+  MountainSnow,
+  Gem,
   Diamond,
-  Box,
-  Droplet,
-  Leaf,
-  Eye,
-  Edit,
   Trash,
+  Edit,
+  Eye,
 } from "lucide-react";
 import * as React from "react";
 
@@ -30,27 +27,26 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { MaterialCategory } from "@/types/material";
+import { calculateMaterialQuality } from "@/lib/material-utils";
 
 interface GetColumnsProps {
   setRowAction: React.Dispatch<
     React.SetStateAction<DataTableRowAction<IMaterial> | null>
   >;
-  onViewMaterial?: (material: IMaterial) => void;
+  onViewMaterial: (material: IMaterial) => void;
 }
-
-// Function to get material category icon
+// Funktion zum Abrufen eines Icons basierend auf der Materialkategorie
 const getMaterialCategoryIcon = (category: MaterialCategory) => {
   switch (category) {
     case MaterialCategory.METAL:
-      return Box;
+      return InspectionPanel;
+    case MaterialCategory.STONE:
+      return MountainSnow;
     case MaterialCategory.GEM:
-      return Diamond;
-    case MaterialCategory.LIQUID:
-      return Droplet;
-    case MaterialCategory.ORGANIC:
-      return Leaf;
+      return Gem;
     default:
-      return Box;
+      return Diamond;
   }
 };
 
@@ -103,12 +99,12 @@ export function getColumns({
     {
       accessorKey: "description",
       header: ({ column }) => (
-        <DataTableColumnHeader column={column} title="Description" />
+        <DataTableColumnHeader column={column} title="Beschreibung" />
       ),
       cell: ({ row }) => {
         return (
           <div className="flex items-center space-x-2">
-            <span className="max-w-[31.25rem] truncate text-sm text-muted-foreground">
+            <span className="max-w-[31.25rem] truncate text-sm text-muted">
               {row.getValue("description") || "N/A"}
             </span>
           </div>
@@ -119,23 +115,19 @@ export function getColumns({
     {
       accessorKey: "category",
       header: ({ column }) => (
-        <DataTableColumnHeader column={column} title="Category" />
+        <DataTableColumnHeader column={column} title="Kategorie" />
       ),
       cell: ({ row }) => {
-        const category = row.getValue("category") as MaterialCategory;
+        const category = row.original.category;
         const Icon = getMaterialCategoryIcon(category);
-        const color = getCategoryColor(category);
 
         return (
           <div className="flex w-[6.25rem] items-center">
             <Icon
               className="mr-2 size-4 text-muted-foreground"
               aria-hidden="true"
-              style={{ color }}
             />
-            <Badge variant="outline" className="capitalize">
-              {category}
-            </Badge>
+            <span className="capitalize">{category}</span>
           </div>
         );
       },
@@ -145,80 +137,29 @@ export function getColumns({
       enableHiding: false,
     },
     {
-      accessorKey: "hardness",
-      header: ({ column }) => (
-        <DataTableColumnHeader column={column} title="Hardness" />
-      ),
-      cell: ({ row }) => {
-        const value = row.getValue("hardness");
-        const hardness = typeof value === "number" ? value : null;
-        return (
-          <div className="flex items-center">
-            <span>{hardness !== null ? hardness : "N/A"}</span>
-          </div>
-        );
-      },
-    },
-    {
       accessorKey: "density",
       header: ({ column }) => (
-        <DataTableColumnHeader column={column} title="Density" />
+        <DataTableColumnHeader column={column} title="Dichte (kg/m³)" />
       ),
       cell: ({ row }) => {
-        const value = row.getValue("density");
-        const density = typeof value === "number" ? value : null;
+        const density = row.original.density;
         return (
           <div className="flex items-center">
-            <span>{density !== null ? `${density} kg/m³` : "N/A"}</span>
+            <span>{density.toFixed(1)}</span>
           </div>
         );
       },
     },
     {
-      accessorKey: "sharpness",
+      accessorKey: "impactFracture",
       header: ({ column }) => (
-        <DataTableColumnHeader column={column} title="Sharpness" />
+        <DataTableColumnHeader column={column} title="Bruchfestigkeit" />
       ),
       cell: ({ row }) => {
-        const value = row.getValue("sharpness");
-        const sharpness = typeof value === "number" ? value : null;
+        const impactFracture = row.original.impactFracture;
         return (
           <div className="flex items-center">
-            <span>{sharpness !== null ? sharpness : "N/A"}</span>
-          </div>
-        );
-      },
-    },
-    {
-      accessorKey: "durability",
-      header: ({ column }) => (
-        <DataTableColumnHeader column={column} title="Durability" />
-      ),
-      cell: ({ row }) => {
-        const value = row.getValue("durability");
-        const durability = typeof value === "number" ? value : null;
-
-        if (durability === null) return <span>N/A</span>;
-
-        return (
-          <div className="w-full">
-            <div className="flex justify-between mb-1 text-xs">
-              <span>{durability}</span>
-            </div>
-            <div className="w-full bg-muted h-2 rounded-full overflow-hidden">
-              <div
-                className={`h-full ${
-                  durability > 75
-                    ? "bg-emerald-500"
-                    : durability > 50
-                    ? "bg-amber-500"
-                    : durability > 25
-                    ? "bg-orange-500"
-                    : "bg-rose-500"
-                }`}
-                style={{ width: `${durability}%` }}
-              ></div>
-            </div>
+            <span>{impactFracture.toFixed(1)}</span>
           </div>
         );
       },
@@ -226,34 +167,127 @@ export function getColumns({
     {
       accessorKey: "valueModifier",
       header: ({ column }) => (
-        <DataTableColumnHeader column={column} title="Value" />
+        <DataTableColumnHeader column={column} title="Wertmod." />
       ),
       cell: ({ row }) => {
-        const value = row.getValue("valueModifier");
-        const numValue = typeof value === "number" ? value : 1;
+        const valueModifier = row.original.valueModifier;
         return (
           <div className="flex items-center">
-            <span>×{numValue.toFixed(2)}</span>
+            <span>×{valueModifier.toFixed(1)}</span>
           </div>
         );
       },
     },
     {
-      accessorKey: "color",
+      accessorKey: "quality",
       header: ({ column }) => (
-        <DataTableColumnHeader column={column} title="Color" />
+        <DataTableColumnHeader column={column} title="Qualität" />
       ),
       cell: ({ row }) => {
-        const color = row.getValue("color") as string;
-        const colorHex = row.original.colorHex || "#888888";
+        const quality = calculateMaterialQuality(row.original);
+
+        // Farbe basierend auf Qualität
+        let colorClass = "bg-red-500";
+        if (quality >= 80) colorClass = "bg-green-500";
+        else if (quality >= 60) colorClass = "bg-lime-500";
+        else if (quality >= 40) colorClass = "bg-yellow-500";
+        else if (quality >= 20) colorClass = "bg-orange-500";
 
         return (
           <div className="flex items-center gap-2">
-            <div
-              className="w-4 h-4 rounded-full border"
-              style={{ backgroundColor: colorHex }}
-            ></div>
-            <span>{color || "N/A"}</span>
+            <div className={`h-2.5 w-2.5 rounded-full ${colorClass}`}></div>
+            <span>{quality.toFixed(0)}</span>
+          </div>
+        );
+      },
+    },
+    {
+      accessorKey: "isMetal",
+      header: ({ column }) => (
+        <DataTableColumnHeader column={column} title="Ist Metall" />
+      ),
+      cell: ({ row }) => {
+        return <span>{row.original.isMetal ? "Ja" : "Nein"}</span>;
+      },
+      enableHiding: true,
+      meta: {
+        filterVariant: "checkbox",
+      },
+    },
+    {
+      accessorKey: "isStone",
+      header: ({ column }) => (
+        <DataTableColumnHeader column={column} title="Ist Stein" />
+      ),
+      cell: ({ row }) => {
+        return <span>{row.original.isStone ? "Ja" : "Nein"}</span>;
+      },
+      enableHiding: true,
+      meta: {
+        filterVariant: "checkbox",
+      },
+    },
+    {
+      accessorKey: "isGem",
+      header: ({ column }) => (
+        <DataTableColumnHeader column={column} title="Ist Edelstein" />
+      ),
+      cell: ({ row }) => {
+        return <span>{row.original.isGem ? "Ja" : "Nein"}</span>;
+      },
+      enableHiding: true,
+      meta: {
+        filterVariant: "checkbox",
+      },
+    },
+    {
+      accessorKey: "isOrganic",
+      header: ({ column }) => (
+        <DataTableColumnHeader column={column} title="Ist Organisch" />
+      ),
+      cell: ({ row }) => {
+        return <span>{row.original.isOrganic ? "Ja" : "Nein"}</span>;
+      },
+      enableHiding: true,
+      meta: {
+        filterVariant: "checkbox",
+      },
+    },
+    {
+      accessorKey: "isFabric",
+      header: ({ column }) => (
+        <DataTableColumnHeader column={column} title="Ist Stoff" />
+      ),
+      cell: ({ row }) => {
+        return <span>{row.original.isFabric ? "Ja" : "Nein"}</span>;
+      },
+      enableHiding: true,
+      meta: {
+        filterVariant: "checkbox",
+      },
+    },
+    {
+      accessorKey: "flags",
+      header: ({ column }) => (
+        <DataTableColumnHeader column={column} title="Eigenschaften" />
+      ),
+      cell: ({ row }) => {
+        const material = row.original;
+        const flags = [];
+
+        if (material.isMetal) flags.push("Metall");
+        if (material.isStone) flags.push("Stein");
+        if (material.isGem) flags.push("Edelstein");
+        if (material.isOrganic) flags.push("Organisch");
+        if (material.isFabric) flags.push("Stoff");
+
+        return (
+          <div className="flex flex-wrap gap-1">
+            {flags.map((flag) => (
+              <Badge key={flag} variant="outline" className="text-xs">
+                {flag}
+              </Badge>
+            ))}
           </div>
         );
       },
@@ -266,7 +300,7 @@ export function getColumns({
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
-                  aria-label="More options"
+                  aria-label="Weitere Optionen"
                   variant="ghost"
                   className="flex size-8 p-0 data-[state=open]:bg-muted"
                 >
@@ -277,22 +311,22 @@ export function getColumns({
                 <DropdownMenuItem
                   onClick={() => onViewMaterial?.(row.original)}
                 >
-                  <Eye className="mr-2 size-4" aria-hidden="true" />
-                  View Details
+                  <Eye className="mr-2 h-4 w-4" />
+                  Details
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   onClick={() => setRowAction({ row, type: "update" })}
                 >
-                  <Edit className="mr-2 size-4" aria-hidden="true" />
-                  Edit
+                  <Edit className="mr-2 h-4 w-4" />
+                  Bearbeiten
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                   onClick={() => setRowAction({ row, type: "delete" })}
                   className="text-destructive"
                 >
-                  <Trash className="mr-2 size-4" aria-hidden="true" />
-                  Delete
+                  <Trash className="mr-2 h-4 w-4" />
+                  Löschen
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>

@@ -1,7 +1,8 @@
+// src/components/materials/delete-materials-dialog.tsx
 "use client";
 
 import { deleteMaterial } from "@/actions/materials";
-import type { IMaterial } from "@/types/material";
+import { IMaterial } from "@/types/material";
 import type { Row } from "@tanstack/react-table";
 import { Loader, Trash } from "lucide-react";
 import * as React from "react";
@@ -49,19 +50,19 @@ export function DeleteMaterialsDialog({
   function onDelete() {
     startDeleteTransition(async () => {
       try {
-        // Delete materials one by one
+        // Materialien einzeln löschen
         for (const material of materials) {
           await deleteMaterial(material.id);
         }
 
         props.onOpenChange?.(false);
         toast.success(
-          `${materials.length === 1 ? "Material" : "Materials"} deleted`
+          `${materials.length === 1 ? "Material" : "Materialien"} gelöscht`
         );
         onSuccess?.();
       } catch (error) {
-        console.error("Error deleting materials:", error);
-        toast.error("Failed to delete materials");
+        console.error("Fehler beim Löschen der Materialien:", error);
+        toast.error("Materialien konnten nicht gelöscht werden");
       }
     });
   }
@@ -73,26 +74,26 @@ export function DeleteMaterialsDialog({
           <DialogTrigger asChild>
             <Button variant="outline" size="sm">
               <Trash className="mr-2 size-4" aria-hidden="true" />
-              Delete ({materials.length})
+              Löschen ({materials.length})
             </Button>
           </DialogTrigger>
         ) : null}
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Are you absolutely sure?</DialogTitle>
+            <DialogTitle>Sind Sie sicher?</DialogTitle>
             <DialogDescription>
-              This action cannot be undone. This will permanently delete
+              Diese Aktion kann nicht rückgängig gemacht werden.
               <span className="font-medium"> {materials.length} </span>
-              {materials.length === 1 ? " material" : " materials"} from the
-              database.
+              {materials.length === 1 ? " Material" : " Materialien"} werden
+              dauerhaft aus der Datenbank gelöscht.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="gap-2 sm:space-x-0">
             <DialogClose asChild>
-              <Button variant="outline">Cancel</Button>
+              <Button variant="outline">Abbrechen</Button>
             </DialogClose>
             <Button
-              aria-label="Delete selected materials"
+              aria-label="Ausgewählte Materialien löschen"
               variant="destructive"
               onClick={onDelete}
               disabled={isDeletePending}
@@ -103,7 +104,7 @@ export function DeleteMaterialsDialog({
                   aria-hidden="true"
                 />
               )}
-              Delete
+              Löschen
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -117,26 +118,26 @@ export function DeleteMaterialsDialog({
         <DrawerTrigger asChild>
           <Button variant="outline" size="sm">
             <Trash className="mr-2 size-4" aria-hidden="true" />
-            Delete ({materials.length})
+            Löschen ({materials.length})
           </Button>
         </DrawerTrigger>
       ) : null}
       <DrawerContent>
         <DrawerHeader>
-          <DrawerTitle>Are you absolutely sure?</DrawerTitle>
+          <DrawerTitle>Sind Sie sicher?</DrawerTitle>
           <DrawerDescription>
-            This action cannot be undone. This will permanently delete
+            Diese Aktion kann nicht rückgängig gemacht werden.
             <span className="font-medium"> {materials.length} </span>
-            {materials.length === 1 ? " material" : " materials"} from the
-            database.
+            {materials.length === 1 ? " Material" : " Materialien"} werden
+            dauerhaft aus der Datenbank gelöscht.
           </DrawerDescription>
         </DrawerHeader>
         <DrawerFooter className="gap-2 sm:space-x-0">
           <DrawerClose asChild>
-            <Button variant="outline">Cancel</Button>
+            <Button variant="outline">Abbrechen</Button>
           </DrawerClose>
           <Button
-            aria-label="Delete selected materials"
+            aria-label="Ausgewählte Materialien löschen"
             variant="destructive"
             onClick={onDelete}
             disabled={isDeletePending}
@@ -144,7 +145,7 @@ export function DeleteMaterialsDialog({
             {isDeletePending && (
               <Loader className="mr-2 size-4 animate-spin" aria-hidden="true" />
             )}
-            Delete
+            Löschen
           </Button>
         </DrawerFooter>
       </DrawerContent>

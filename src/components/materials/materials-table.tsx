@@ -1,6 +1,7 @@
+// src/components/materials/materials-table.tsx
 "use client";
 
-import { IMaterial, MaterialCategory } from "@/types/material";
+import { IMaterial } from "@/types/material";
 import type { DataTableRowAction } from "@/types";
 import * as React from "react";
 
@@ -25,6 +26,7 @@ import { DeleteMaterialsDialog } from "./delete-materials-dialog";
 import { MaterialUpdateSheet } from "./material-update-sheet";
 import { MaterialDetailSheet } from "./material-detail-sheet";
 import { MaterialCreateSheet } from "./material-create-sheet";
+import { MaterialCategory } from "@/types/material";
 
 interface MaterialsTableProps {
   materials: IMaterial[];
@@ -38,35 +40,33 @@ export function MaterialsTable({ materials }: MaterialsTableProps) {
   const [selectedMaterial, setSelectedMaterial] =
     React.useState<IMaterial | null>(null);
 
-  // Function to handle viewing a material's details
+  // Funktion zum Anzeigen der Material-Details
   const handleViewMaterial = (material: IMaterial) => {
     setSelectedMaterial(material);
     setIsDetailSheetOpen(true);
   };
 
-  // Function to handle editing a material
+  // Funktion zum Bearbeiten eines Materials
   const handleEditMaterial = (material: IMaterial) => {
     setRowAction({ row: { original: material } as any, type: "update" });
   };
 
-  // Function to handle deleting a material
+  // Funktion zum Löschen eines Materials
   const handleDeleteMaterial = (material: IMaterial) => {
     setRowAction({ row: { original: material } as any, type: "delete" });
   };
 
-  // Function to handle creating a new material
+  // Funktion zum Erstellen eines neuen Materials
   const handleCreateMaterial = () => {
     setIsCreateSheetOpen(true);
   };
 
-  // Function to handle refreshing the materials list (after changes)
+  // Funktion zum Aktualisieren der Materialliste nach Änderungen
   const handleRefresh = () => {
-    // In a real app, you might want to refetch data from the server
-    // For now, we'll just log that we would refresh
-    console.log("Refreshing materials list");
+    console.log("Aktualisiere Materialliste");
   };
 
-  // Custom columns with a view action added
+  // Spalten mit View-Aktion
   const customColumns = React.useMemo(() => {
     const cols = getColumns({
       setRowAction,
@@ -75,7 +75,7 @@ export function MaterialsTable({ materials }: MaterialsTableProps) {
     return cols;
   }, []);
 
-  // Calculate category counts for filters
+  // Zählen der Materialien pro Kategorie für Filter
   const categoryCounts = React.useMemo(() => {
     const counts: Record<string, number> = {};
     materials.forEach((material) => {
@@ -84,30 +84,25 @@ export function MaterialsTable({ materials }: MaterialsTableProps) {
     return counts;
   }, [materials]);
 
-  // Define filters
+  // Filter definieren
   const filterFields = [
     {
       id: "name",
       label: "Name",
-      placeholder: "Filter by name...",
+      placeholder: "Filter nach Name...",
     },
     {
       id: "category",
-      label: "Category",
+      label: "Kategorie",
       options: Object.values(MaterialCategory).map((category) => ({
-        label: toSentenceCase(category.toLowerCase()),
+        label: toSentenceCase(category),
         value: category,
         count: categoryCounts[category] || 0,
       })),
     },
-    {
-      id: "color",
-      label: "Color",
-      placeholder: "Filter by color...",
-    },
   ];
 
-  // Table state
+  // Tabellen-State
   const [sorting, setSorting] = React.useState<SortingState>([
     { id: "name", desc: false },
   ]);
@@ -117,11 +112,6 @@ export function MaterialsTable({ materials }: MaterialsTableProps) {
   const [columnVisibility, setColumnVisibility] =
     React.useState<VisibilityState>({
       description: false,
-      density: false,
-      impactYield: false,
-      impactFracture: false,
-      shearYield: false,
-      shearFracture: false,
     });
   const [rowSelection, setRowSelection] = React.useState<RowSelectionState>({});
   const [pagination, setPagination] = React.useState({
@@ -129,7 +119,7 @@ export function MaterialsTable({ materials }: MaterialsTableProps) {
     pageSize: 10,
   });
 
-  // Create table
+  // Tabelle erstellen
   const table = useReactTable({
     data: materials,
     columns: customColumns,
@@ -162,7 +152,7 @@ export function MaterialsTable({ materials }: MaterialsTableProps) {
         </DataTableToolbar>
       </DataTable>
 
-      {/* Material Detail Sheet */}
+      {/* Material-Details-Sheet */}
       <MaterialDetailSheet
         material={selectedMaterial}
         open={isDetailSheetOpen}
@@ -181,26 +171,26 @@ export function MaterialsTable({ materials }: MaterialsTableProps) {
         }}
       />
 
-      {/* Update Sheet */}
+      {/* Update-Sheet */}
       <MaterialUpdateSheet
         open={rowAction?.type === "update"}
         onOpenChange={(open) => {
           if (!open) {
             setRowAction(null);
-            handleRefresh(); // Call refresh when Sheet closes instead
+            handleRefresh();
           }
         }}
         material={rowAction?.row.original ?? null}
       />
 
-      {/* Create material Sheet */}
+      {/* Material erstellen Sheet */}
       <MaterialCreateSheet
         open={isCreateSheetOpen}
         onOpenChange={setIsCreateSheetOpen}
         onSuccess={handleRefresh}
       />
 
-      {/* Delete dialog */}
+      {/* Lösch-Dialog */}
       <DeleteMaterialsDialog
         open={rowAction?.type === "delete"}
         onOpenChange={() => setRowAction(null)}

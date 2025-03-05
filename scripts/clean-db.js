@@ -4,16 +4,15 @@ const { createDbPool, logger } = require('./db-utils');
 
 // Tabellen zum Säubern in der richtigen Reihenfolge (unter Berücksichtigung von Fremdschlüsselbeziehungen)
 const TABLES = [
-    'material_transformations',
-    'composite_components',
-    'composite_materials',
     'material_states',
     'material_properties',
     'weapon_materials',
     'weapon_range',
     'weapon_grasp',
     'weapons',
-    'materials'
+    'materials',
+    'users',
+    'migrations',
 ];
 
 // Nach Bestätigung fragen, bevor fortgefahren wird
@@ -39,8 +38,8 @@ async function cleanDatabase(options = {}) {
 
     try {
         logger.header("Datenbank säubern");
-        logger.warn("Dies löscht ALLE Daten aus den folgenden Tabellen:");
-        tables.forEach(table => logger.warn(`- ${table}`));
+        logger.warn("WARNUNG: Dies löscht das GESAMTE public Schema und erstellt es neu!");
+        logger.warn("Alle Tabellen, Funktionen, Sequenzen und andere Datenbankobjekte werden gelöscht.");
         logger.info(`Datenbank: ${process.env.POSTGRES_DATABASE}`);
 
         let proceed = !confirmPrompt;
@@ -58,18 +57,17 @@ async function cleanDatabase(options = {}) {
         try {
             await client.query('BEGIN');
 
-            for (const table of tables) {
-                logger.info(`Lösche Tabelle: ${table}...`);
-                await client.query(`DELETE FROM ${table}`);
-                logger.success(`Tabelle ${table} geleert`);
-            }
+            logger.info("Lösche das public Schema...");
+            await client.query('DROP SCHEMA public CASCADE');
+            logger.info("Erstelle das public Schema neu...");
+            await client.query('CREATE SCHEMA public');
 
             await client.query('COMMIT');
-            logger.success("Datenbanksäuberung erfolgreich abgeschlossen");
+            logger.success("Datenbank wurde erfolgreich zurückgesetzt");
             return { success: true };
         } catch (error) {
             await client.query('ROLLBACK');
-            logger.error(`Fehler beim Säubern der Datenbank: ${error.message}`);
+            logger.error(`Fehler beim Zurücksetzen der Datenbank: ${error.message}`);
             return { success: false, error };
         } finally {
             client.release();

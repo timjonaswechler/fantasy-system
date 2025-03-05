@@ -3,10 +3,10 @@
 
 import React, { useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm, useFieldArray } from "react-hook-form";
+import { useForm } from "react-hook-form";
 import * as z from "zod";
 import { toast } from "sonner";
-import { Loader, Plus, Trash, Info, X, Layers } from "lucide-react";
+import { Loader, Plus, Trash, Palette } from "lucide-react";
 
 import {
   Form,
@@ -36,313 +36,381 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Badge } from "@/components/ui/badge";
 import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 
-import { MaterialCategory, MaterialState } from "@/types/material";
+import { MaterialCategory, MaterialFormData } from "@/types/material";
 import { createMaterial } from "@/actions/materials";
-import { createCompositeMaterial } from "@/actions/material-composites";
-import { CompositeMaterialDesigner } from "./composite-material-designer";
 
-// Form validation schema
+// Formularvalidierungsschema
 const materialFormSchema = z.object({
   name: z.string().min(2, {
-    message: "Name must be at least 2 characters long",
+    message: "Name muss mindestens 2 Zeichen lang sein",
   }),
   description: z.string().optional(),
   category: z.nativeEnum(MaterialCategory),
-
-  // Physical properties
-  density: z.coerce.number().optional(),
+  density: z.coerce.number().min(0),
+  valueModifier: z.coerce.number().min(0),
+  impactYield: z.coerce.number().min(0),
+  impactFracture: z.coerce.number().min(0),
+  impactStrainAtYield: z.coerce.number().min(0),
+  shearYield: z.coerce.number().min(0),
+  shearFracture: z.coerce.number().min(0),
+  shearStrainAtYield: z.coerce.number().min(0),
   meltingPoint: z.coerce.number().optional(),
   boilingPoint: z.coerce.number().optional(),
   ignitePoint: z.coerce.number().optional(),
-
-  // Mechanical properties
-  impactYield: z.coerce.number().optional(),
-  impactFracture: z.coerce.number().optional(),
-  shearYield: z.coerce.number().optional(),
-  shearFracture: z.coerce.number().optional(),
-
-  // Combat properties
-  hardness: z.coerce.number().min(0).max(100).optional(),
-  sharpness: z.coerce.number().min(0).max(100).optional(),
-  durability: z.coerce.number().min(0).max(100).optional(),
-
-  // Appearance
-  color: z.string().min(1, { message: "Color is required" }),
-  colorHex: z
-    .string()
-    .regex(/^#[0-9A-Fa-f]{6}$/, {
-      message: "Color must be a valid hex color (e.g. #FF0000)",
-    })
-    .optional(),
-
-  // Special properties
-  isMagical: z.boolean().default(false),
-  isRare: z.boolean().default(false),
-  valueModifier: z.coerce.number().min(0).default(1),
-
-  // Source
-  sourceLocation: z.string().optional(),
-  sourceCreature: z.string().optional(),
-  sourcePlant: z.string().optional(),
-
-  // Additional properties
-  properties: z
-    .array(
-      z.object({
-        name: z.string().min(1, { message: "Property name is required" }),
-        value: z.string().min(1, { message: "Property value is required" }),
-      })
-    )
-    .optional(),
-
-  // States
-  states: z
-    .array(
-      z.object({
-        state: z.nativeEnum(MaterialState),
-        description: z.string().optional(),
-        color: z.string().optional(),
-      })
-    )
+  specificHeat: z.coerce.number().optional(),
+  displayColor: z.string().regex(/^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/, {
+    message: "Muss ein gültiger HEX-Farbcode sein (z.B. #FF0000)",
+  }),
+  isMetal: z.boolean().default(false),
+  isStone: z.boolean().default(false),
+  isGem: z.boolean().default(false),
+  isOrganic: z.boolean().default(false),
+  isFabric: z.boolean().default(false),
+  additionalProperties: z
+    .record(z.string(), z.union([z.string(), z.number(), z.boolean()]))
     .optional(),
 });
 
 type MaterialFormValues = z.infer<typeof materialFormSchema>;
 
-interface MaterialCreateSheetProps
+interface CreateMaterialSheetProps
   extends React.ComponentPropsWithRef<typeof Sheet> {
-  availableMaterials?: Array<{
-    id: string;
-    name: string;
-    category: MaterialCategory;
-    colorHex?: string;
-    hardness?: number;
-    durability?: number;
-  }>;
-  onSuccess?: (materialId?: string) => void;
+  onSuccess?: () => void;
 }
-interface CompositeMaterialDesignerProps
-  extends React.ComponentPropsWithRef<typeof Sheet> {
-  availableMaterials: Array<{
-    id: string;
-    name: string;
-    category: MaterialCategory;
-    colorHex?: string;
-    hardness?: number;
-    durability?: number;
-  }>;
-  onSuccess?: (materialId: string) => void;
-}
+
 export function MaterialCreateSheet({
-  availableMaterials = [],
   onSuccess,
   ...props
-}: MaterialCreateSheetProps) {
+}: CreateMaterialSheetProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [creationMode, setCreationMode] = useState<"basic" | "composite">(
-    "basic"
-  );
-  const [isCompositeDesignerOpen, setIsCompositeDesignerOpen] = useState(false);
+  const [additionalProps, setAdditionalProps] = useState<
+    Record<string, string>
+  >({});
+  const [newPropKey, setNewPropKey] = useState("");
+  const [newPropValue, setNewPropValue] = useState("");
 
-  // Initialize form with default values
+  // Formular initialisieren
   const form = useForm<MaterialFormValues>({
     resolver: zodResolver(materialFormSchema),
     defaultValues: {
       name: "",
       description: "",
       category: MaterialCategory.METAL,
-      density: undefined,
+      density: 0,
+      valueModifier: 1.0,
+      impactYield: 0,
+      impactFracture: 0,
+      impactStrainAtYield: 0.001,
+      shearYield: 0,
+      shearFracture: 0,
+      shearStrainAtYield: 0.001,
       meltingPoint: undefined,
       boilingPoint: undefined,
       ignitePoint: undefined,
-      impactYield: undefined,
-      impactFracture: undefined,
-      shearYield: undefined,
-      shearFracture: undefined,
-      hardness: 50,
-      sharpness: 0,
-      durability: 50,
-      color: "",
-      colorHex: "#888888",
-      isMagical: false,
-      isRare: false,
-      valueModifier: 1,
-      sourceLocation: "",
-      sourceCreature: "",
-      sourcePlant: "",
-      properties: [],
-      states: [
-        {
-          state: MaterialState.SOLID,
-          description: "",
-          color: "",
-        },
-      ],
+      specificHeat: undefined,
+      displayColor: "#CCCCCC",
+      isMetal: false,
+      isStone: false,
+      isGem: false,
+      isOrganic: false,
+      isFabric: false,
     },
   });
 
-  // Setup field arrays for properties and states
-  const {
-    fields: propertyFields,
-    append: appendProperty,
-    remove: removeProperty,
-  } = useFieldArray({
-    control: form.control,
-    name: "properties",
-  });
-
-  const {
-    fields: stateFields,
-    append: appendState,
-    remove: removeState,
-  } = useFieldArray({
-    control: form.control,
-    name: "states",
-  });
-
-  // Handle composite material creation
-  const handleCreateCompositeMaterial = async (data: any) => {
+  // Formular-Submission-Handler
+  const onSubmit = async (values: MaterialFormValues) => {
     setIsSubmitting(true);
     try {
-      const result = await createCompositeMaterial(data);
+      // Zusätzliche Eigenschaften dem Formular hinzufügen
+      const formData: MaterialFormData = {
+        ...values,
+        description: values.description || "",
+        additionalProperties:
+          Object.keys(additionalProps).length > 0 ? additionalProps : undefined,
+      };
+
+      const result = await createMaterial(formData);
       if (result.success) {
-        toast.success("Composite material created successfully");
-        setIsCompositeDesignerOpen(false);
-        props.onOpenChange?.(false);
-        onSuccess?.(result.id);
-      } else {
-        toast.error(result.error || "Failed to create composite material");
+        toast.success("Material erfolgreich erstellt");
+        form.reset(); // Formular zurücksetzen
+        setAdditionalProps({});
+        props.onOpenChange?.(false); // Sheet schließen
+        onSuccess?.(); // Erfolgs-Callback aufrufen
       }
     } catch (error) {
-      console.error("Error creating composite material:", error);
-      toast.error("An error occurred while creating the composite material");
+      console.error("Fehler beim Speichern des Materials:", error);
+      toast.error("Fehler beim Erstellen des Materials");
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  // Form submission handler
-  const onSubmit = async (values: MaterialFormValues) => {
-    setIsSubmitting(true);
-    try {
-      // Ensure all optional string fields have default values
-      const formattedValues = {
-        ...values,
-        description: values.description || "",
-        colorHex: values.colorHex || "",
-        sourceLocation: values.sourceLocation || "",
-        sourceCreature: values.sourceCreature || "",
-        sourcePlant: values.sourcePlant || "",
-        states: values.states?.map((state) => ({
-          ...state,
-          description: state.description || "",
-          color: state.color || "",
-        })),
-      };
+  // Zusätzliche Eigenschaft hinzufügen
+  const addProperty = () => {
+    if (newPropKey.trim() && newPropValue.trim()) {
+      setAdditionalProps((prev) => ({
+        ...prev,
+        [newPropKey.trim()]: newPropValue.trim(),
+      }));
+      setNewPropKey("");
+      setNewPropValue("");
+    }
+  };
 
-      const result = await createMaterial(formattedValues);
-      if (result.success) {
-        toast.success("Material created successfully");
-        form.reset(); // Reset form
-        props.onOpenChange?.(false); // Close drawer
-        onSuccess?.(result.id); // Call success callback
-      }
-    } catch (error) {
-      console.error("Error submitting form:", error);
-      toast.error("Error saving material");
-    } finally {
-      setIsSubmitting(false);
+  // Zusätzliche Eigenschaft entfernen
+  const removeProperty = (key: string) => {
+    const { [key]: _, ...rest } = additionalProps;
+    setAdditionalProps(rest);
+  };
+
+  // Kategorie-Änderung behandeln
+  const handleCategoryChange = (value: string) => {
+    const category = value as MaterialCategory;
+    form.setValue("category", category);
+
+    // Flags automatisch anpassen
+    switch (category) {
+      case MaterialCategory.METAL:
+        form.setValue("isMetal", true);
+        form.setValue("isStone", false);
+        form.setValue("isGem", false);
+        form.setValue("isOrganic", false);
+        form.setValue("isFabric", false);
+        break;
+      case MaterialCategory.STONE:
+        form.setValue("isMetal", false);
+        form.setValue("isStone", true);
+        form.setValue("isGem", false);
+        form.setValue("isOrganic", false);
+        form.setValue("isFabric", false);
+        break;
+      case MaterialCategory.GEM:
+        form.setValue("isMetal", false);
+        form.setValue("isStone", false);
+        form.setValue("isGem", true);
+        form.setValue("isOrganic", false);
+        form.setValue("isFabric", false);
+        break;
+      // Weitere Kategorien nach Bedarf...
     }
   };
 
   return (
-    <>
-      <Sheet {...props}>
-        <SheetContent className="w-full sm:max-w-2xl overflow-y-auto">
-          <SheetHeader>
-            <SheetTitle>Create New Material</SheetTitle>
-            <SheetDescription>
-              Add a new material to your inventory
-            </SheetDescription>
-          </SheetHeader>
+    <Sheet {...props}>
+      <SheetContent className="w-full sm:max-w-2xl overflow-y-auto">
+        <SheetHeader>
+          <SheetTitle>Neues Material erstellen</SheetTitle>
+          <SheetDescription>
+            Fügen Sie der Materialdatenbank ein neues Material hinzu
+          </SheetDescription>
+        </SheetHeader>
 
-          <div className="mt-6 mb-6">
-            <div className="flex space-x-4">
-              <Button
-                variant={creationMode === "basic" ? "default" : "outline"}
-                onClick={() => setCreationMode("basic")}
-                className="flex-1"
-              >
-                Basic Material
-              </Button>
-              <Button
-                variant={creationMode === "composite" ? "default" : "outline"}
-                onClick={() => setCreationMode("composite")}
-                className="flex-1"
-                disabled={availableMaterials.length < 2}
-              >
-                <Layers className="mr-2 h-4 w-4" />
-                Composite Material
-              </Button>
-            </div>
-            {availableMaterials.length < 2 && creationMode === "basic" && (
-              <p className="text-sm text-muted-foreground mt-2">
-                You need at least 2 materials to create a composite material.
-              </p>
-            )}
-          </div>
+        <Form {...form}>
+          <form
+            onSubmit={form.handleSubmit(onSubmit)}
+            className="flex flex-col gap-5 mt-6"
+          >
+            <div className="space-y-4">
+              <FormField
+                control={form.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Name</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Materialname" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-          {creationMode === "basic" ? (
-            <Form {...form}>
-              <form
-                onSubmit={form.handleSubmit(onSubmit)}
-                className="flex flex-col gap-5"
-              >
-                <Tabs defaultValue="basic" className="w-full">
-                  <TabsList className="grid grid-cols-4 mb-4">
-                    <TabsTrigger value="basic">Basic</TabsTrigger>
-                    <TabsTrigger value="physical">Physical</TabsTrigger>
-                    <TabsTrigger value="properties">Properties</TabsTrigger>
-                    <TabsTrigger value="states">States</TabsTrigger>
-                  </TabsList>
+              <FormField
+                control={form.control}
+                name="description"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Beschreibung</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        placeholder="Materialbeschreibung"
+                        className="resize-none"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-                  {/* Basic Tab */}
-                  <TabsContent value="basic" className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="category"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Kategorie</FormLabel>
+                      <Select
+                        onValueChange={handleCategoryChange}
+                        defaultValue={field.value}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Materialkategorie wählen" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {Object.values(MaterialCategory).map((category) => (
+                            <SelectItem key={category} value={category}>
+                              {category}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="displayColor"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Anzeigefarbe</FormLabel>
+                      <div className="flex items-center gap-2">
+                        <FormControl>
+                          <Input placeholder="#CCCCCC" {...field} />
+                        </FormControl>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="icon"
+                              className="size-8"
+                              style={{ backgroundColor: field.value }}
+                            >
+                              <Palette className="h-4 w-4" />
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-64">
+                            <div className="grid grid-cols-8 gap-1">
+                              {[
+                                "#CCCCCC",
+                                "#000000",
+                                "#FFFFFF",
+                                "#FF0000",
+                                "#00FF00",
+                                "#0000FF",
+                                "#FFFF00",
+                                "#FF00FF",
+                                "#00FFFF",
+                                "#FFA500",
+                                "#800080",
+                                "#008000",
+                                "#800000",
+                                "#008080",
+                                "#808000",
+                                "#A52A2A",
+                                "#C0C0C0",
+                                "#808080",
+                                "#FFD700",
+                                "#B87333",
+                                "#FF6347",
+                                "#4682B4",
+                                "#32CD32",
+                                "#9370DB",
+                                "#F4A460",
+                                "#2F4F4F",
+                                "#CD853F",
+                                "#F5F5DC",
+                                "#D3D3D3",
+                                "#D2B48C",
+                                "#E6E6FA",
+                                "#F0F8FF",
+                                "#E0FFFF",
+                                "#FFFACD",
+                                "#FFF0F5",
+                                "#F0FFF0",
+                              ].map((color) => (
+                                <button
+                                  key={color}
+                                  type="button"
+                                  className="size-6 rounded-sm border border-gray-300"
+                                  style={{ backgroundColor: color }}
+                                  onClick={() =>
+                                    form.setValue("displayColor", color)
+                                  }
+                                />
+                              ))}
+                            </div>
+                          </PopoverContent>
+                        </Popover>
+                      </div>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="density"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Dichte (kg/m³)</FormLabel>
+                      <FormControl>
+                        <Input type="number" step="0.1" min="0" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="valueModifier"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Wertmodifikator</FormLabel>
+                      <FormControl>
+                        <Input type="number" step="0.1" min="0" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <Separator />
+
+              <h3 className="text-lg font-medium">Mechanische Eigenschaften</h3>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <h4 className="text-md font-medium mb-2">Druckfestigkeit</h4>
+                  <div className="space-y-3">
                     <FormField
                       control={form.control}
-                      name="name"
+                      name="impactYield"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Name</FormLabel>
+                          <FormLabel>Streckgrenze (N/mm²)</FormLabel>
                           <FormControl>
-                            <Input placeholder="Material name" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={form.control}
-                      name="description"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Description</FormLabel>
-                          <FormControl>
-                            <Textarea
-                              placeholder="Material description"
-                              className="resize-none"
+                            <Input
+                              type="number"
+                              step="0.1"
+                              min="0"
                               {...field}
                             />
                           </FormControl>
@@ -350,697 +418,389 @@ export function MaterialCreateSheet({
                         </FormItem>
                       )}
                     />
-
                     <FormField
                       control={form.control}
-                      name="category"
+                      name="impactFracture"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Category</FormLabel>
-                          <Select
-                            onValueChange={field.onChange}
-                            defaultValue={field.value}
-                          >
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Choose category" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              {Object.values(MaterialCategory).map(
-                                (category) => (
-                                  <SelectItem
-                                    key={category}
-                                    value={category}
-                                    className="capitalize"
-                                  >
-                                    {category.toLowerCase()}
-                                  </SelectItem>
-                                )
-                              )}
-                            </SelectContent>
-                          </Select>
+                          <FormLabel>Bruchfestigkeit (N/mm²)</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              step="0.1"
+                              min="0"
+                              {...field}
+                            />
+                          </FormControl>
                           <FormMessage />
                         </FormItem>
                       )}
                     />
+                    <FormField
+                      control={form.control}
+                      name="impactStrainAtYield"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Dehnung bei Streckgrenze</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              step="0.001"
+                              min="0"
+                              {...field}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <FormField
-                        control={form.control}
-                        name="color"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Color Name</FormLabel>
-                            <FormControl>
-                              <Input
-                                placeholder="e.g. Silver, Red"
-                                {...field}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
+                <div>
+                  <h4 className="text-md font-medium mb-2">Scherfestigkeit</h4>
+                  <div className="space-y-3">
+                    <FormField
+                      control={form.control}
+                      name="shearYield"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Streckgrenze (N/mm²)</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              step="0.1"
+                              min="0"
+                              {...field}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="shearFracture"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Bruchfestigkeit (N/mm²)</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              step="0.1"
+                              min="0"
+                              {...field}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="shearStrainAtYield"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Dehnung bei Streckgrenze</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              step="0.001"
+                              min="0"
+                              {...field}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                </div>
+              </div>
 
-                      <FormField
-                        control={form.control}
-                        name="colorHex"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Color Hex</FormLabel>
-                            <div className="flex gap-2">
-                              <FormControl>
-                                <Input placeholder="#RRGGBB" {...field} />
-                              </FormControl>
-                              <div
-                                className="h-10 w-10 rounded-md border"
-                                style={{
-                                  backgroundColor: field.value || "#888888",
-                                }}
-                              ></div>
-                            </div>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </div>
+              <Separator />
 
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                      <FormField
-                        control={form.control}
-                        name="valueModifier"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Value Modifier</FormLabel>
-                            <FormControl>
-                              <Input
-                                type="number"
-                                min="0"
-                                step="0.1"
-                                {...field}
-                              />
-                            </FormControl>
-                            <FormDescription>
-                              Base value multiplier
-                            </FormDescription>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
+              <h3 className="text-lg font-medium">Thermische Eigenschaften</h3>
 
-                      <FormField
-                        control={form.control}
-                        name="isMagical"
-                        render={({ field }) => (
-                          <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
-                            <FormControl>
-                              <Checkbox
-                                checked={field.value}
-                                onCheckedChange={field.onChange}
-                              />
-                            </FormControl>
-                            <div className="space-y-1 leading-none">
-                              <FormLabel>Magical</FormLabel>
-                              <FormDescription>
-                                Has magical properties
-                              </FormDescription>
-                            </div>
-                          </FormItem>
-                        )}
-                      />
-
-                      <FormField
-                        control={form.control}
-                        name="isRare"
-                        render={({ field }) => (
-                          <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
-                            <FormControl>
-                              <Checkbox
-                                checked={field.value}
-                                onCheckedChange={field.onChange}
-                              />
-                            </FormControl>
-                            <div className="space-y-1 leading-none">
-                              <FormLabel>Rare</FormLabel>
-                              <FormDescription>
-                                Hard to find material
-                              </FormDescription>
-                            </div>
-                          </FormItem>
-                        )}
-                      />
-                    </div>
-
-                    <Separator />
-
-                    <div className="space-y-4">
-                      <h3 className="text-lg font-medium">
-                        Source Information
-                      </h3>
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                        <FormField
-                          control={form.control}
-                          name="sourceLocation"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Location</FormLabel>
-                              <FormControl>
-                                <Input
-                                  placeholder="Source location"
-                                  {...field}
-                                />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="meltingPoint"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Schmelzpunkt (°C)</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          step="0.1"
+                          {...field}
+                          value={field.value === undefined ? "" : field.value}
+                          onChange={(e) =>
+                            field.onChange(
+                              e.target.value === ""
+                                ? undefined
+                                : parseFloat(e.target.value)
+                            )
+                          }
                         />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-                        <FormField
-                          control={form.control}
-                          name="sourceCreature"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Creature</FormLabel>
-                              <FormControl>
-                                <Input
-                                  placeholder="Source creature"
-                                  {...field}
-                                />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
+                <FormField
+                  control={form.control}
+                  name="boilingPoint"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Siedepunkt (°C)</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          step="0.1"
+                          {...field}
+                          value={field.value === undefined ? "" : field.value}
+                          onChange={(e) =>
+                            field.onChange(
+                              e.target.value === ""
+                                ? undefined
+                                : parseFloat(e.target.value)
+                            )
+                          }
                         />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-                        <FormField
-                          control={form.control}
-                          name="sourcePlant"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Plant</FormLabel>
-                              <FormControl>
-                                <Input placeholder="Source plant" {...field} />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
+                <FormField
+                  control={form.control}
+                  name="specificHeat"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>
+                        Spezifische Wärmekapazität (J/(kg·K))
+                      </FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          {...field}
+                          value={field.value === undefined ? "" : field.value}
+                          onChange={(e) =>
+                            field.onChange(
+                              e.target.value === ""
+                                ? undefined
+                                : parseFloat(e.target.value)
+                            )
+                          }
                         />
-                      </div>
-                    </div>
-                  </TabsContent>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-                  {/* Physical Tab */}
-                  <TabsContent value="physical" className="space-y-4">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <FormField
-                        control={form.control}
-                        name="density"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Density (kg/m³)</FormLabel>
-                            <TooltipProvider>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <div className="flex items-center gap-2">
-                                    <FormControl>
-                                      <Input
-                                        type="number"
-                                        min="0"
-                                        step="0.1"
-                                        {...field}
-                                      />
-                                    </FormControl>
-                                    <Info className="h-4 w-4 text-muted-foreground" />
-                                  </div>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                  <p>Typical values:</p>
-                                  <ul className="text-xs mt-1">
-                                    <li>Water: 1000 kg/m³</li>
-                                    <li>Iron: 7870 kg/m³</li>
-                                    <li>Gold: 19300 kg/m³</li>
-                                    <li>Wood: 400-900 kg/m³</li>
-                                  </ul>
-                                </TooltipContent>
-                              </Tooltip>
-                            </TooltipProvider>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-
-                      <FormField
-                        control={form.control}
-                        name="durability"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Durability (0-100)</FormLabel>
-                            <FormControl>
-                              <Input
-                                type="number"
-                                min="0"
-                                max="100"
-                                {...field}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-
-                      <FormField
-                        control={form.control}
-                        name="hardness"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Hardness (0-100)</FormLabel>
-                            <FormControl>
-                              <Input
-                                type="number"
-                                min="0"
-                                max="100"
-                                {...field}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-
-                      <FormField
-                        control={form.control}
-                        name="sharpness"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Sharpness (0-100)</FormLabel>
-                            <FormControl>
-                              <Input
-                                type="number"
-                                min="0"
-                                max="100"
-                                {...field}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </div>
-
-                    <Separator />
-
-                    <div className="space-y-4">
-                      <h3 className="text-lg font-medium">
-                        Temperature Properties
-                      </h3>
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                        <FormField
-                          control={form.control}
-                          name="meltingPoint"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Melting Point (°C)</FormLabel>
-                              <FormControl>
-                                <Input type="number" {...field} />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
+                <FormField
+                  control={form.control}
+                  name="ignitePoint"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Zündtemperatur (°C, falls brennbar)</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          step="0.1"
+                          {...field}
+                          value={field.value === undefined ? "" : field.value}
+                          onChange={(e) =>
+                            field.onChange(
+                              e.target.value === ""
+                                ? undefined
+                                : parseFloat(e.target.value)
+                            )
+                          }
                         />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
 
-                        <FormField
-                          control={form.control}
-                          name="boilingPoint"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Boiling Point (°C)</FormLabel>
-                              <FormControl>
-                                <Input type="number" {...field} />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
+              <Separator />
+
+              <h3 className="text-lg font-medium">Materialeigenschaften</h3>
+
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                <FormField
+                  control={form.control}
+                  name="isMetal"
+                  render={({ field }) => (
+                    <FormItem className="flex items-center gap-2">
+                      <FormControl>
+                        <Checkbox
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
                         />
+                      </FormControl>
+                      <FormLabel className="cursor-pointer">Metall</FormLabel>
+                    </FormItem>
+                  )}
+                />
 
-                        <FormField
-                          control={form.control}
-                          name="ignitePoint"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Ignite Point (°C)</FormLabel>
-                              <FormControl>
-                                <Input type="number" {...field} />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
+                <FormField
+                  control={form.control}
+                  name="isStone"
+                  render={({ field }) => (
+                    <FormItem className="flex items-center gap-2">
+                      <FormControl>
+                        <Checkbox
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
                         />
-                      </div>
-                    </div>
+                      </FormControl>
+                      <FormLabel className="cursor-pointer">Stein</FormLabel>
+                    </FormItem>
+                  )}
+                />
 
-                    <Separator />
-
-                    <div className="space-y-4">
-                      <h3 className="text-lg font-medium">
-                        Mechanical Properties
-                      </h3>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <FormField
-                          control={form.control}
-                          name="impactYield"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Impact Yield</FormLabel>
-                              <FormControl>
-                                <Input type="number" min="0" {...field} />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
+                <FormField
+                  control={form.control}
+                  name="isGem"
+                  render={({ field }) => (
+                    <FormItem className="flex items-center gap-2">
+                      <FormControl>
+                        <Checkbox
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
                         />
+                      </FormControl>
+                      <FormLabel className="cursor-pointer">
+                        Edelstein
+                      </FormLabel>
+                    </FormItem>
+                  )}
+                />
 
-                        <FormField
-                          control={form.control}
-                          name="impactFracture"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Impact Fracture</FormLabel>
-                              <FormControl>
-                                <Input type="number" min="0" {...field} />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
+                <FormField
+                  control={form.control}
+                  name="isOrganic"
+                  render={({ field }) => (
+                    <FormItem className="flex items-center gap-2">
+                      <FormControl>
+                        <Checkbox
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
                         />
+                      </FormControl>
+                      <FormLabel className="cursor-pointer">
+                        Organisch
+                      </FormLabel>
+                    </FormItem>
+                  )}
+                />
 
-                        <FormField
-                          control={form.control}
-                          name="shearYield"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Shear Yield</FormLabel>
-                              <FormControl>
-                                <Input type="number" min="0" {...field} />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
+                <FormField
+                  control={form.control}
+                  name="isFabric"
+                  render={({ field }) => (
+                    <FormItem className="flex items-center gap-2">
+                      <FormControl>
+                        <Checkbox
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
                         />
+                      </FormControl>
+                      <FormLabel className="cursor-pointer">Stoff</FormLabel>
+                    </FormItem>
+                  )}
+                />
+              </div>
 
-                        <FormField
-                          control={form.control}
-                          name="shearFracture"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Shear Fracture</FormLabel>
-                              <FormControl>
-                                <Input type="number" min="0" {...field} />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                      </div>
-                    </div>
-                  </TabsContent>
+              <Separator />
 
-                  {/* Custom Properties Tab */}
-                  <TabsContent value="properties" className="space-y-4">
-                    <div className="flex justify-between items-center">
-                      <h3 className="text-lg font-medium">Custom Properties</h3>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => appendProperty({ name: "", value: "" })}
-                      >
-                        <Plus className="mr-2 h-4 w-4" />
-                        Add Property
-                      </Button>
-                    </div>
+              <h3 className="text-lg font-medium mb-2">
+                Zusätzliche Eigenschaften
+              </h3>
 
-                    {propertyFields.length === 0 ? (
-                      <div className="text-center py-4 text-muted-foreground">
-                        No custom properties added yet. Click "Add Property" to
-                        create one.
-                      </div>
-                    ) : (
-                      <div className="space-y-4">
-                        {propertyFields.map((field, index) => (
-                          <div
-                            key={field.id}
-                            className="flex gap-2 items-start"
+              <div className="space-y-4">
+                {/* Bestehende zusätzliche Eigenschaften anzeigen */}
+                {Object.entries(additionalProps).length > 0 && (
+                  <div className="rounded-md border p-3">
+                    <div className="space-y-2">
+                      {Object.entries(additionalProps).map(([key, value]) => (
+                        <div
+                          key={key}
+                          className="flex items-center justify-between"
+                        >
+                          <div className="flex-1 grid grid-cols-2 gap-2">
+                            <div className="text-sm font-medium">{key}:</div>
+                            <div>{value}</div>
+                          </div>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => removeProperty(key)}
                           >
-                            <FormField
-                              control={form.control}
-                              name={`properties.${index}.name`}
-                              render={({ field }) => (
-                                <FormItem className="flex-1">
-                                  <FormLabel className="sr-only">
-                                    Name
-                                  </FormLabel>
-                                  <FormControl>
-                                    <Input
-                                      placeholder="Property name"
-                                      {...field}
-                                    />
-                                  </FormControl>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-                            <FormField
-                              control={form.control}
-                              name={`properties.${index}.value`}
-                              render={({ field }) => (
-                                <FormItem className="flex-1">
-                                  <FormLabel className="sr-only">
-                                    Value
-                                  </FormLabel>
-                                  <FormControl>
-                                    <Input
-                                      placeholder="Property value"
-                                      {...field}
-                                    />
-                                  </FormControl>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => removeProperty(index)}
-                              className="mt-1"
-                            >
-                              <X className="h-4 w-4" />
-                              <span className="sr-only">Remove</span>
-                            </Button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-
-                    <div className="text-sm text-muted-foreground mt-4">
-                      <p>
-                        Custom properties allow you to add any additional data
-                        about this material.
-                      </p>
-                      <p>
-                        Examples: Conductivity, Magical Affinity, Crafting
-                        Difficulty, etc.
-                      </p>
-                    </div>
-                  </TabsContent>
-
-                  {/* Material States Tab */}
-                  <TabsContent value="states" className="space-y-4">
-                    <div className="flex justify-between items-center">
-                      <h3 className="text-lg font-medium">Material States</h3>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() =>
-                          appendState({
-                            state: MaterialState.LIQUID,
-                            description: "",
-                            color: "",
-                          })
-                        }
-                      >
-                        <Plus className="mr-2 h-4 w-4" />
-                        Add State
-                      </Button>
-                    </div>
-
-                    <div className="space-y-4">
-                      {stateFields.map((field, index) => (
-                        <div key={field.id} className="border rounded-md p-4">
-                          <div className="flex justify-between items-center mb-2">
-                            <FormField
-                              control={form.control}
-                              name={`states.${index}.state`}
-                              render={({ field }) => (
-                                <FormItem className="flex-1">
-                                  <FormLabel>State</FormLabel>
-                                  <Select
-                                    onValueChange={field.onChange}
-                                    defaultValue={field.value}
-                                  >
-                                    <FormControl>
-                                      <SelectTrigger>
-                                        <SelectValue placeholder="Choose state" />
-                                      </SelectTrigger>
-                                    </FormControl>
-                                    <SelectContent>
-                                      {Object.values(MaterialState).map(
-                                        (state) => (
-                                          <SelectItem
-                                            key={state}
-                                            value={state}
-                                            className="capitalize"
-                                          >
-                                            {state.toLowerCase()}
-                                          </SelectItem>
-                                        )
-                                      )}
-                                    </SelectContent>
-                                  </Select>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => removeState(index)}
-                              className="ml-2"
-                              disabled={stateFields.length <= 1}
-                            >
-                              <Trash className="h-4 w-4" />
-                              <span className="sr-only">Remove</span>
-                            </Button>
-                          </div>
-
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
-                            <FormField
-                              control={form.control}
-                              name={`states.${index}.description`}
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel>Description</FormLabel>
-                                  <FormControl>
-                                    <Textarea
-                                      placeholder="Description of this state"
-                                      className="resize-none"
-                                      {...field}
-                                    />
-                                  </FormControl>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-
-                            <FormField
-                              control={form.control}
-                              name={`states.${index}.color`}
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel>Color</FormLabel>
-                                  <FormControl>
-                                    <Input
-                                      placeholder="Color in this state"
-                                      {...field}
-                                    />
-                                  </FormControl>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-                          </div>
+                            <Trash className="h-4 w-4" />
+                          </Button>
                         </div>
                       ))}
                     </div>
-                  </TabsContent>
-                </Tabs>
+                  </div>
+                )}
 
-                <SheetFooter className="mt-6 border-t pt-6">
-                  <SheetClose asChild>
-                    <Button type="button" variant="outline">
-                      Cancel
-                    </Button>
-                  </SheetClose>
-                  <Button type="submit" disabled={isSubmitting}>
-                    {isSubmitting ? (
-                      <>
-                        <Loader className="mr-2 h-4 w-4 animate-spin" />
-                        Creating...
-                      </>
-                    ) : (
-                      "Create Material"
-                    )}
+                {/* Formular zum Hinzufügen neuer Eigenschaften */}
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="Eigenschaft"
+                    value={newPropKey}
+                    onChange={(e) => setNewPropKey(e.target.value)}
+                    className="flex-1"
+                  />
+                  <Input
+                    placeholder="Wert"
+                    value={newPropValue}
+                    onChange={(e) => setNewPropValue(e.target.value)}
+                    className="flex-1"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={addProperty}
+                    disabled={!newPropKey.trim() || !newPropValue.trim()}
+                  >
+                    <Plus className="h-4 w-4" />
                   </Button>
-                </SheetFooter>
-              </form>
-            </Form>
-          ) : (
-            // If in composite mode, show button to open composite designer
-            <div className="flex flex-col items-center justify-center h-[500px] gap-4">
-              <div className="text-center max-w-md">
-                <h3 className="text-lg font-medium mb-2">
-                  Create Composite Material
-                </h3>
-                <p className="text-sm text-muted-foreground mb-6">
-                  Composite materials combine multiple materials to create a new
-                  material with properties derived from its components.
-                </p>
-                <Button
-                  onClick={() => setIsCompositeDesignerOpen(true)}
-                  className="w-full"
-                >
-                  <Layers className="mr-2 h-4 w-4" />
-                  Open Composite Designer
-                </Button>
-              </div>
-
-              <div className="border rounded-lg p-6 mt-4 w-full max-w-md">
-                <h4 className="font-medium mb-2">
-                  Examples of composite materials:
-                </h4>
-                <ul className="space-y-2 text-sm">
-                  <li className="flex items-center gap-2">
-                    <Badge className="bg-gray-700">Alloy</Badge>
-                    <span>Steel (Iron + Carbon)</span>
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <Badge className="bg-amber-700">Blend</Badge>
-                    <span>Bronze (Copper + Tin)</span>
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <Badge className="bg-emerald-700">Compound</Badge>
-                    <span>Reinforced Wood (Wood + Resin)</span>
-                  </li>
-                </ul>
+                </div>
               </div>
             </div>
-          )}
-        </SheetContent>
-      </Sheet>
 
-      {/* Composite Material Designer */}
-      <CompositeMaterialDesigner
-        availableMaterials={availableMaterials}
-        open={isCompositeDesignerOpen}
-        onOpenChange={setIsCompositeDesignerOpen}
-        onSuccess={(materialId) => {
-          props.onOpenChange?.(false);
-          onSuccess?.(materialId);
-        }}
-      />
-    </>
+            <SheetFooter className="mt-6 border-t pt-6">
+              <SheetClose asChild>
+                <Button type="button" variant="outline">
+                  Abbrechen
+                </Button>
+              </SheetClose>
+              <Button type="submit" disabled={isSubmitting}>
+                {isSubmitting ? (
+                  <>
+                    <Loader className="mr-2 h-4 w-4 animate-spin" />
+                    Wird erstellt...
+                  </>
+                ) : (
+                  "Material erstellen"
+                )}
+              </Button>
+            </SheetFooter>
+          </form>
+        </Form>
+      </SheetContent>
+    </Sheet>
   );
 }

@@ -1,3 +1,4 @@
+// src/components/materials/materials-table-toolbar-actions.tsx
 "use client";
 
 import { IMaterial } from "@/types/material";
@@ -8,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { exportTableToJSON } from "@/lib/export";
 
 import { DeleteMaterialsDialog } from "./delete-materials-dialog";
+import { ImportMaterialsDialog } from "./import-materials-dialog";
 
 interface MaterialsTableToolbarActionsProps {
   table: Table<IMaterial>;
@@ -52,9 +54,15 @@ export function MaterialsTableToolbarActions({
         </Button>
       )}
 
+      <ImportMaterialsDialog
+        onSuccess={() => {
+          window.location.reload();
+        }}
+      />
+
       <Button size="sm" className="gap-2" onClick={onCreateMaterial}>
         <Plus className="size-4" aria-hidden="true" />
-        New Material
+        Neues Material
       </Button>
     </div>
   );

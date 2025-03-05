@@ -12,9 +12,9 @@ export default async function MaterialsPage() {
     <Shell className="gap-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Materials</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Materialien</h1>
           <p className="text-muted-foreground">
-            Manage your materials inventory
+            Verwalten Sie Ihre Materialdatenbank
           </p>
         </div>
       </div>
@@ -22,17 +22,18 @@ export default async function MaterialsPage() {
       <React.Suspense
         fallback={
           <DataTableSkeleton
-            columnCount={7}
+            columnCount={8}
             searchableColumnCount={1}
             filterableColumnCount={2}
             cellWidths={[
               "10rem",
-              "12rem",
               "8rem",
               "8rem",
               "6rem",
-              "8rem",
               "6rem",
+              "6rem",
+              "8rem",
+              "8rem",
             ]}
             shrinkZero
           />
@@ -44,7 +45,7 @@ export default async function MaterialsPage() {
   );
 }
 
-// Separate component to fetch data within suspense boundary
+// Separate Komponente zum Abrufen der Daten innerhalb der Suspense-Boundary
 async function MaterialsTableWrapper() {
   const materials = await getMaterials();
   return <MaterialsTable materials={materials} />;

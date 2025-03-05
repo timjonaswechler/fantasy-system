@@ -6,170 +6,148 @@ import { query, mutate, transaction } from "@/lib/db";
 import {
   IMaterial,
   MaterialCategory,
-  MaterialState,
   MaterialFormData,
+  MaterialState,
 } from "@/types/material";
 
-// Helper function to generate a unique ID for a material
-function generateMaterialId(name: string): string {
-  return name
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "");
-}
-
-// Server Action to fetch all materials
+// Server Action zum Abrufen aller Materialien
 export async function getMaterials(): Promise<IMaterial[]> {
   try {
-    // Get materials from database
+    // Materialien aus der Datenbank abrufen
     const materials = await query<any>(`
       SELECT 
-        m.id, 
+        m.id as "dbId",
         m.material_id as id, 
         m.name, 
-        m.description, 
         m.category, 
-        m.density, 
-        m.melting_point as "meltingPoint", 
-        m.boiling_point as "boilingPoint", 
-        m.ignite_point as "ignitePoint",
-        m.impact_yield as "impactYield", 
-        m.impact_fracture as "impactFracture", 
-        m.shear_yield as "shearYield", 
-        m.shear_fracture as "shearFracture",
-        m.hardness, 
-        m.sharpness, 
-        m.durability,
-        m.color,
-        m.color_hex as "colorHex",
-        m.is_magical as "isMagical",
-        m.is_rare as "isRare",
+        m.description, 
+        m.density,
         m.value_modifier as "valueModifier",
-        m.source_location as "sourceLocation",
-        m.source_creature as "sourceCreature",
-        m.source_plant as "sourcePlant",
-        m.created_at as "createdAt"
+        m.impact_yield as "impactYield",
+        m.impact_fracture as "impactFracture",
+        m.impact_strain_at_yield as "impactStrainAtYield",
+        m.shear_yield as "shearYield",
+        m.shear_fracture as "shearFracture",
+        m.shear_strain_at_yield as "shearStrainAtYield",
+        m.melting_point as "meltingPoint",
+        m.boiling_point as "boilingPoint",
+        m.ignite_point as "ignitePoint",
+        m.specific_heat as "specificHeat",
+        m.display_color as "displayColor",
+        m.is_metal as "isMetal",
+        m.is_stone as "isStone",
+        m.is_gem as "isGem",
+        m.is_organic as "isOrganic",
+        m.is_fabric as "isFabric",
+        m.created_at as "createdAt",
+        m.updated_at as "updatedAt"
       FROM materials m
       ORDER BY m.name ASC
     `);
 
-    // Get additional properties for each material
-    const materialIds = materials.map((m) => m.id);
+    // Material-IDs für die erweiterten Eigenschaften abrufen
+    const materialIds = materials.map((m) => m.dbId);
+
+    // Erweiterte Eigenschaften für alle Materialien abrufen
     const properties = await query<any>(
       `
       SELECT 
-        mp.material_id, 
-        mp.property_name, 
-        mp.property_value
+        mp.material_id as "materialId", 
+        mp.key, 
+        mp.value,
+        mp.value_type as "valueType",
+        m.material_id as "externalId"
       FROM material_properties mp
       JOIN materials m ON m.id = mp.material_id
-      WHERE m.material_id = ANY($1)
+      WHERE mp.material_id = ANY($1)
       `,
       [materialIds]
     );
 
-    // Get states for each material
+    // Optional: Material-Zustände abrufen, wenn benötigt
     const states = await query<any>(
       `
       SELECT 
-        ms.material_id, 
-        ms.state_name, 
-        ms.state_description, 
-        ms.state_color
+        ms.material_id as "materialId", 
+        ms.state,
+        ms.state_description as "stateDescription",
+        ms.transition_temperature as "transitionTemperature",
+        ms.transition_energy as "transitionEnergy",
+        m.material_id as "externalId"
       FROM material_states ms
       JOIN materials m ON m.id = ms.material_id
-      WHERE m.material_id = ANY($1)
+      WHERE ms.material_id = ANY($1)
       `,
       [materialIds]
     );
 
-    // Map the database results to the IMaterial interface
+    // Mapping der Datenbankdaten auf die IMaterial-Schnittstelle
     return materials.map((material) => {
-      // Convert the properties to a Map
-      const propertiesMap = new Map<string, string>();
-      properties
-        .filter((p) => p.material_id === material.dbId)
-        .forEach((p) => {
-          propertiesMap.set(p.property_name, p.property_value);
-        });
+      // Erweiterte Eigenschaften für dieses Material sammeln
+      const materialProperties = properties
+        .filter((p) => p.materialId === material.dbId)
+        .reduce((acc, prop) => {
+          let value: any = prop.value;
+          // Wert entsprechend seinem Typ konvertieren
+          if (prop.valueType === "number") value = parseFloat(value);
+          else if (prop.valueType === "boolean") value = value === "true";
+          acc[prop.key] = value;
+          return acc;
+        }, {});
 
-      // Convert the states to a Map
-      const statesMap = new Map<
-        MaterialState,
-        { description?: string; color?: string }
-      >();
-      states
-        .filter((s) => s.material_id === material.dbId)
-        .forEach((s) => {
-          statesMap.set(s.state_name as MaterialState, {
-            description: s.state_description,
-            color: s.state_color,
-          });
-        });
+      // Zustände für dieses Material sammeln (wenn benötigt)
+      const materialStates = states
+        .filter((s) => s.materialId === material.dbId)
+        .map((s) => ({
+          state: s.state,
+          description: s.stateDescription,
+          transitionTemperature: s.transitionTemperature,
+          transitionEnergy: s.transitionEnergy,
+        }));
 
+      // Material-Objekt zurückgeben
       return {
         id: material.id,
         name: material.name,
-        description: material.description || "",
         category: material.category as MaterialCategory,
-        density:
-          typeof material.density === "string"
-            ? parseFloat(material.density)
-            : material.density,
-        meltingPoint:
-          typeof material.meltingPoint === "string"
-            ? parseFloat(material.meltingPoint)
-            : material.meltingPoint,
-        boilingPoint:
-          typeof material.boilingPoint === "string"
-            ? parseFloat(material.boilingPoint)
-            : material.boilingPoint,
-        ignitePoint:
-          typeof material.ignitePoint === "string"
-            ? parseFloat(material.ignitePoint)
-            : material.ignitePoint,
-        impactYield:
-          typeof material.impactYield === "string"
-            ? parseFloat(material.impactYield)
-            : material.impactYield,
-        impactFracture:
-          typeof material.impactFracture === "string"
-            ? parseFloat(material.impactFracture)
-            : material.impactFracture,
-        shearYield:
-          typeof material.shearYield === "string"
-            ? parseFloat(material.shearYield)
-            : material.shearYield,
-        shearFracture:
-          typeof material.shearFracture === "string"
-            ? parseFloat(material.shearFracture)
-            : material.shearFracture,
-        hardness:
-          typeof material.hardness === "string"
-            ? parseFloat(material.hardness)
-            : material.hardness,
-        sharpness:
-          typeof material.sharpness === "string"
-            ? parseFloat(material.sharpness)
-            : material.sharpness,
-        durability:
-          typeof material.durability === "string"
-            ? parseFloat(material.durability)
-            : material.durability,
-        color: material.color,
-        colorHex: material.colorHex,
-        isMagical: Boolean(material.isMagical),
-        isRare: Boolean(material.isRare),
-        valueModifier:
-          typeof material.valueModifier === "string"
-            ? parseFloat(material.valueModifier)
-            : material.valueModifier || 1.0,
-        sourceLocation: material.sourceLocation,
-        sourceCreature: material.sourceCreature,
-        sourcePlant: material.sourcePlant,
-        properties: propertiesMap,
-        states: statesMap,
-        createdAt: new Date(material.createdAt),
+        description: material.description || "",
+        density: parseFloat(material.density) || 0,
+        valueModifier: parseFloat(material.valueModifier) || 1.0,
+        impactYield: parseFloat(material.impactYield) || 0,
+        impactFracture: parseFloat(material.impactFracture) || 0,
+        impactStrainAtYield: parseFloat(material.impactStrainAtYield) || 0,
+        shearYield: parseFloat(material.shearYield) || 0,
+        shearFracture: parseFloat(material.shearFracture) || 0,
+        shearStrainAtYield: parseFloat(material.shearStrainAtYield) || 0,
+        meltingPoint: material.meltingPoint
+          ? parseFloat(material.meltingPoint)
+          : undefined,
+        boilingPoint: material.boilingPoint
+          ? parseFloat(material.boilingPoint)
+          : undefined,
+        ignitePoint: material.ignitePoint
+          ? parseFloat(material.ignitePoint)
+          : undefined,
+        specificHeat: material.specificHeat
+          ? parseFloat(material.specificHeat)
+          : undefined,
+        displayColor: material.displayColor || "#CCCCCC",
+        isMetal: Boolean(material.isMetal),
+        isStone: Boolean(material.isStone),
+        isGem: Boolean(material.isGem),
+        isOrganic: Boolean(material.isOrganic),
+        isFabric: Boolean(material.isFabric),
+        additionalProperties:
+          Object.keys(materialProperties).length > 0
+            ? materialProperties
+            : undefined,
+        createdAt: material.createdAt
+          ? new Date(material.createdAt)
+          : undefined,
+        updatedAt: material.updatedAt
+          ? new Date(material.updatedAt)
+          : undefined,
+        // Bei Bedarf: states: materialStates
       };
     });
   } catch (error) {
@@ -178,38 +156,38 @@ export async function getMaterials(): Promise<IMaterial[]> {
   }
 }
 
-// Server Action to fetch material by ID
+// Material anhand seiner ID abrufen
 export async function getMaterialById(id: string): Promise<IMaterial | null> {
   try {
-    // Get material from database
+    // Material aus der Datenbank abrufen
     const materials = await query<any>(
       `
       SELECT 
         m.id as "dbId",
         m.material_id as id, 
         m.name, 
-        m.description, 
         m.category, 
-        m.density, 
-        m.melting_point as "meltingPoint", 
-        m.boiling_point as "boilingPoint", 
-        m.ignite_point as "ignitePoint",
-        m.impact_yield as "impactYield", 
-        m.impact_fracture as "impactFracture", 
-        m.shear_yield as "shearYield", 
-        m.shear_fracture as "shearFracture",
-        m.hardness, 
-        m.sharpness, 
-        m.durability,
-        m.color,
-        m.color_hex as "colorHex",
-        m.is_magical as "isMagical",
-        m.is_rare as "isRare",
+        m.description, 
+        m.density,
         m.value_modifier as "valueModifier",
-        m.source_location as "sourceLocation",
-        m.source_creature as "sourceCreature",
-        m.source_plant as "sourcePlant",
-        m.created_at as "createdAt"
+        m.impact_yield as "impactYield",
+        m.impact_fracture as "impactFracture",
+        m.impact_strain_at_yield as "impactStrainAtYield",
+        m.shear_yield as "shearYield",
+        m.shear_fracture as "shearFracture",
+        m.shear_strain_at_yield as "shearStrainAtYield",
+        m.melting_point as "meltingPoint",
+        m.boiling_point as "boilingPoint",
+        m.ignite_point as "ignitePoint",
+        m.specific_heat as "specificHeat",
+        m.display_color as "displayColor",
+        m.is_metal as "isMetal",
+        m.is_stone as "isStone",
+        m.is_gem as "isGem",
+        m.is_organic as "isOrganic",
+        m.is_fabric as "isFabric",
+        m.created_at as "createdAt",
+        m.updated_at as "updatedAt"
       FROM materials m
       WHERE m.material_id = $1
     `,
@@ -222,112 +200,66 @@ export async function getMaterialById(id: string): Promise<IMaterial | null> {
 
     const material = materials[0];
 
-    // Get properties for the material
+    // Erweiterte Eigenschaften für das Material abrufen
     const properties = await query<any>(
       `
-      SELECT 
-        property_name, 
-        property_value
+      SELECT key, value, value_type as "valueType"
       FROM material_properties
       WHERE material_id = $1
     `,
       [material.dbId]
     );
 
-    // Get states for the material
-    const states = await query<any>(
-      `
-      SELECT 
-        state_name, 
-        state_description, 
-        state_color
-      FROM material_states
-      WHERE material_id = $1
-    `,
-      [material.dbId]
+    // Materialeigenschaften in ein Objekt umwandeln
+    const additionalProperties = properties.reduce(
+      (acc: Record<string, any>, prop: any) => {
+        let value: any = prop.value;
+        if (prop.valueType === "number") value = parseFloat(value);
+        else if (prop.valueType === "boolean") value = value === "true";
+        acc[prop.key] = value;
+        return acc;
+      },
+      {}
     );
 
-    // Convert the properties to a Map
-    const propertiesMap = new Map<string, string>();
-    properties.forEach((p) => {
-      propertiesMap.set(p.property_name, p.property_value);
-    });
-
-    // Convert the states to a Map
-    const statesMap = new Map<
-      MaterialState,
-      { description?: string; color?: string }
-    >();
-    states.forEach((s) => {
-      statesMap.set(s.state_name as MaterialState, {
-        description: s.state_description,
-        color: s.state_color,
-      });
-    });
-
+    // Material-Objekt zurückgeben
     return {
       id: material.id,
       name: material.name,
-      description: material.description || "",
       category: material.category as MaterialCategory,
-      density:
-        typeof material.density === "string"
-          ? parseFloat(material.density)
-          : material.density,
-      meltingPoint:
-        typeof material.meltingPoint === "string"
-          ? parseFloat(material.meltingPoint)
-          : material.meltingPoint,
-      boilingPoint:
-        typeof material.boilingPoint === "string"
-          ? parseFloat(material.boilingPoint)
-          : material.boilingPoint,
-      ignitePoint:
-        typeof material.ignitePoint === "string"
-          ? parseFloat(material.ignitePoint)
-          : material.ignitePoint,
-      impactYield:
-        typeof material.impactYield === "string"
-          ? parseFloat(material.impactYield)
-          : material.impactYield,
-      impactFracture:
-        typeof material.impactFracture === "string"
-          ? parseFloat(material.impactFracture)
-          : material.impactFracture,
-      shearYield:
-        typeof material.shearYield === "string"
-          ? parseFloat(material.shearYield)
-          : material.shearYield,
-      shearFracture:
-        typeof material.shearFracture === "string"
-          ? parseFloat(material.shearFracture)
-          : material.shearFracture,
-      hardness:
-        typeof material.hardness === "string"
-          ? parseFloat(material.hardness)
-          : material.hardness,
-      sharpness:
-        typeof material.sharpness === "string"
-          ? parseFloat(material.sharpness)
-          : material.sharpness,
-      durability:
-        typeof material.durability === "string"
-          ? parseFloat(material.durability)
-          : material.durability,
-      color: material.color,
-      colorHex: material.colorHex,
-      isMagical: Boolean(material.isMagical),
-      isRare: Boolean(material.isRare),
-      valueModifier:
-        typeof material.valueModifier === "string"
-          ? parseFloat(material.valueModifier)
-          : material.valueModifier || 1.0,
-      sourceLocation: material.sourceLocation,
-      sourceCreature: material.sourceCreature,
-      sourcePlant: material.sourcePlant,
-      properties: propertiesMap,
-      states: statesMap,
-      createdAt: new Date(material.createdAt),
+      description: material.description || "",
+      density: parseFloat(material.density) || 0,
+      valueModifier: parseFloat(material.valueModifier) || 1.0,
+      impactYield: parseFloat(material.impactYield) || 0,
+      impactFracture: parseFloat(material.impactFracture) || 0,
+      impactStrainAtYield: parseFloat(material.impactStrainAtYield) || 0,
+      shearYield: parseFloat(material.shearYield) || 0,
+      shearFracture: parseFloat(material.shearFracture) || 0,
+      shearStrainAtYield: parseFloat(material.shearStrainAtYield) || 0,
+      meltingPoint: material.meltingPoint
+        ? parseFloat(material.meltingPoint)
+        : undefined,
+      boilingPoint: material.boilingPoint
+        ? parseFloat(material.boilingPoint)
+        : undefined,
+      ignitePoint: material.ignitePoint
+        ? parseFloat(material.ignitePoint)
+        : undefined,
+      specificHeat: material.specificHeat
+        ? parseFloat(material.specificHeat)
+        : undefined,
+      displayColor: material.displayColor || "#CCCCCC",
+      isMetal: Boolean(material.isMetal),
+      isStone: Boolean(material.isStone),
+      isGem: Boolean(material.isGem),
+      isOrganic: Boolean(material.isOrganic),
+      isFabric: Boolean(material.isFabric),
+      additionalProperties:
+        Object.keys(additionalProperties).length > 0
+          ? additionalProperties
+          : undefined,
+      createdAt: material.createdAt ? new Date(material.createdAt) : undefined,
+      updatedAt: material.updatedAt ? new Date(material.updatedAt) : undefined,
     };
   } catch (error) {
     console.error(`Error fetching material with ID ${id}:`, error);
@@ -335,101 +267,78 @@ export async function getMaterialById(id: string): Promise<IMaterial | null> {
   }
 }
 
-// Server Action to create a new material
+// Neues Material erstellen
 export async function createMaterial(formData: MaterialFormData) {
   try {
     return await transaction(async (client) => {
-      // Generate a unique material_id based on name
-      const materialId = generateMaterialId(formData.name);
+      // Einzigartige material_id basierend auf dem Namen generieren (slug-Format)
+      const materialId = formData.name
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-|-$/g, "");
 
-      // Insert material into database
+      // Material in die Datenbank einfügen
       const result = await client.query(
         `
         INSERT INTO materials (
-          material_id, 
-          name, 
-          description, 
-          category,
-          density, 
-          melting_point, 
-          boiling_point, 
-          ignite_point,
-          impact_yield, 
-          impact_fracture, 
-          shear_yield, 
-          shear_fracture,
-          hardness, 
-          sharpness, 
-          durability,
-          color,
-          color_hex,
-          is_magical,
-          is_rare,
-          value_modifier,
-          source_location,
-          source_creature,
-          source_plant
+          material_id, name, category, description, density, 
+          value_modifier, impact_yield, impact_fracture, impact_strain_at_yield,
+          shear_yield, shear_fracture, shear_strain_at_yield,
+          melting_point, boiling_point, ignite_point, specific_heat,
+          display_color, is_metal, is_stone, is_gem, is_organic, is_fabric
         ) VALUES (
-          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 
-          $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23
+          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 
+          $14, $15, $16, $17, $18, $19, $20, $21, $22
         ) RETURNING id
       `,
         [
           materialId,
           formData.name,
-          formData.description,
           formData.category,
-          formData.density,
-          formData.meltingPoint,
-          formData.boilingPoint,
-          formData.ignitePoint,
-          formData.impactYield,
-          formData.impactFracture,
-          formData.shearYield,
-          formData.shearFracture,
-          formData.hardness,
-          formData.sharpness,
-          formData.durability,
-          formData.color,
-          formData.colorHex,
-          formData.isMagical || false,
-          formData.isRare || false,
+          formData.description || "",
+          formData.density || 0,
           formData.valueModifier || 1.0,
-          formData.sourceLocation,
-          formData.sourceCreature,
-          formData.sourcePlant,
+          formData.impactYield || 0,
+          formData.impactFracture || 0,
+          formData.impactStrainAtYield || 0,
+          formData.shearYield || 0,
+          formData.shearFracture || 0,
+          formData.shearStrainAtYield || 0,
+          formData.meltingPoint || null,
+          formData.boilingPoint || null,
+          formData.ignitePoint || null,
+          formData.specificHeat || null,
+          formData.displayColor || "#CCCCCC",
+          formData.isMetal || false,
+          formData.isStone || false,
+          formData.isGem || false,
+          formData.isOrganic || false,
+          formData.isFabric || false,
         ]
       );
 
       const materialDbId = result.rows[0].id;
 
-      // Insert properties if provided
-      if (formData.properties && formData.properties.length > 0) {
-        for (const prop of formData.properties) {
+      // Zusätzliche Eigenschaften speichern, falls vorhanden
+      if (
+        formData.additionalProperties &&
+        typeof formData.additionalProperties === "object"
+      ) {
+        for (const [key, value] of Object.entries(
+          formData.additionalProperties
+        )) {
+          const valueType = typeof value;
           await client.query(
             `
-            INSERT INTO material_properties (material_id, property_name, property_value)
-            VALUES ($1, $2, $3)
-          `,
-            [materialDbId, prop.name, prop.value]
-          );
-        }
-      }
-
-      // Insert states if provided
-      if (formData.states && formData.states.length > 0) {
-        for (const state of formData.states) {
-          await client.query(
-            `
-            INSERT INTO material_states (material_id, state_name, state_description, state_color)
+            INSERT INTO material_properties (material_id, key, value, value_type)
             VALUES ($1, $2, $3, $4)
           `,
-            [materialDbId, state.state, state.description, state.color]
+            [materialDbId, key, String(value), valueType]
           );
         }
       }
 
-      // Revalidate pages
+      // Seiten revalidieren
       revalidatePath("/materials");
 
       return { success: true, id: materialId };
@@ -440,11 +349,11 @@ export async function createMaterial(formData: MaterialFormData) {
   }
 }
 
-// Server Action to update a material
+// Material aktualisieren
 export async function updateMaterial(id: string, formData: MaterialFormData) {
   try {
     return await transaction(async (client) => {
-      // First get the database ID from the material_id
+      // Zuerst die Datenbank-ID vom material_id abrufen
       const idResult = await client.query(
         `
         SELECT id FROM materials WHERE material_id = $1
@@ -458,63 +367,61 @@ export async function updateMaterial(id: string, formData: MaterialFormData) {
 
       const materialDbId = idResult.rows[0].id;
 
-      // Update material in database
+      // Material in der Datenbank aktualisieren
       await client.query(
         `
         UPDATE materials SET
           name = $1,
-          description = $2,
-          category = $3,
+          category = $2,
+          description = $3,
           density = $4,
-          melting_point = $5,
-          boiling_point = $6,
-          ignite_point = $7,
-          impact_yield = $8,
-          impact_fracture = $9,
-          shear_yield = $10,
-          shear_fracture = $11,
-          hardness = $12,
-          sharpness = $13,
-          durability = $14,
-          color = $15,
-          color_hex = $16,
-          is_magical = $17,
-          is_rare = $18,
-          value_modifier = $19,
-          source_location = $20,
-          source_creature = $21,
-          source_plant = $22,
+          value_modifier = $5,
+          impact_yield = $6,
+          impact_fracture = $7,
+          impact_strain_at_yield = $8,
+          shear_yield = $9,
+          shear_fracture = $10,
+          shear_strain_at_yield = $11,
+          melting_point = $12,
+          boiling_point = $13,
+          ignite_point = $14,
+          specific_heat = $15,
+          display_color = $16,
+          is_metal = $17,
+          is_stone = $18,
+          is_gem = $19,
+          is_organic = $20,
+          is_fabric = $21,
           updated_at = CURRENT_TIMESTAMP
-        WHERE id = $23
+        WHERE id = $22
       `,
         [
           formData.name,
-          formData.description,
           formData.category,
-          formData.density,
-          formData.meltingPoint,
-          formData.boilingPoint,
-          formData.ignitePoint,
-          formData.impactYield,
-          formData.impactFracture,
-          formData.shearYield,
-          formData.shearFracture,
-          formData.hardness,
-          formData.sharpness,
-          formData.durability,
-          formData.color,
-          formData.colorHex,
-          formData.isMagical || false,
-          formData.isRare || false,
+          formData.description || "",
+          formData.density || 0,
           formData.valueModifier || 1.0,
-          formData.sourceLocation,
-          formData.sourceCreature,
-          formData.sourcePlant,
+          formData.impactYield || 0,
+          formData.impactFracture || 0,
+          formData.impactStrainAtYield || 0,
+          formData.shearYield || 0,
+          formData.shearFracture || 0,
+          formData.shearStrainAtYield || 0,
+          formData.meltingPoint || null,
+          formData.boilingPoint || null,
+          formData.ignitePoint || null,
+          formData.specificHeat || null,
+          formData.displayColor || "#CCCCCC",
+          formData.isMetal || false,
+          formData.isStone || false,
+          formData.isGem || false,
+          formData.isOrganic || false,
+          formData.isFabric || false,
           materialDbId,
         ]
       );
 
-      // Delete existing properties
+      // Bestehende zusätzliche Eigenschaften löschen
       await client.query(
         `
         DELETE FROM material_properties WHERE material_id = $1
@@ -522,41 +429,26 @@ export async function updateMaterial(id: string, formData: MaterialFormData) {
         [materialDbId]
       );
 
-      // Insert new properties
-      if (formData.properties && formData.properties.length > 0) {
-        for (const prop of formData.properties) {
+      // Neue zusätzliche Eigenschaften einfügen
+      if (
+        formData.additionalProperties &&
+        typeof formData.additionalProperties === "object"
+      ) {
+        for (const [key, value] of Object.entries(
+          formData.additionalProperties
+        )) {
+          const valueType = typeof value;
           await client.query(
             `
-            INSERT INTO material_properties (material_id, property_name, property_value)
-            VALUES ($1, $2, $3)
-          `,
-            [materialDbId, prop.name, prop.value]
-          );
-        }
-      }
-
-      // Delete existing states
-      await client.query(
-        `
-        DELETE FROM material_states WHERE material_id = $1
-      `,
-        [materialDbId]
-      );
-
-      // Insert new states
-      if (formData.states && formData.states.length > 0) {
-        for (const state of formData.states) {
-          await client.query(
-            `
-            INSERT INTO material_states (material_id, state_name, state_description, state_color)
+            INSERT INTO material_properties (material_id, key, value, value_type)
             VALUES ($1, $2, $3, $4)
           `,
-            [materialDbId, state.state, state.description, state.color]
+            [materialDbId, key, String(value), valueType]
           );
         }
       }
 
-      // Revalidate pages
+      // Seiten revalidieren
       revalidatePath(`/materials/${id}`);
       revalidatePath("/materials");
 
@@ -568,10 +460,10 @@ export async function updateMaterial(id: string, formData: MaterialFormData) {
   }
 }
 
-// Server Action to delete a material
+// Material löschen
 export async function deleteMaterial(id: string) {
   try {
-    // First get the database ID from the material_id
+    // Zuerst die Datenbank-ID vom material_id abrufen
     const idResult = await query<any>(
       `
       SELECT id FROM materials WHERE material_id = $1
@@ -585,7 +477,7 @@ export async function deleteMaterial(id: string) {
 
     const materialDbId = idResult[0].id;
 
-    // The foreign key constraints will automatically delete related records
+    // Die Fremdschlüsselbeziehungen löschen automatisch zugehörige Datensätze
     await mutate(
       `
       DELETE FROM materials WHERE id = $1
@@ -593,7 +485,7 @@ export async function deleteMaterial(id: string) {
       [materialDbId]
     );
 
-    // Revalidate pages
+    // Seiten revalidieren
     revalidatePath("/materials");
 
     return { success: true };
@@ -603,7 +495,7 @@ export async function deleteMaterial(id: string) {
   }
 }
 
-// Server Action to get materials by category
+// Materialien nach Kategorie abrufen
 export async function getMaterialsByCategory(
   category: MaterialCategory
 ): Promise<IMaterial[]> {
@@ -620,122 +512,11 @@ export async function getMaterialsByCategory(
 
     const materialIds = materialsOfCategory.map((m) => m.id);
 
-    // Use the existing getMaterials function and filter
+    // Alle Materialien abrufen und nach Kategorie filtern
     const allMaterials = await getMaterials();
     return allMaterials.filter((material) => materialIds.includes(material.id));
   } catch (error) {
     console.error(`Error fetching materials of category ${category}:`, error);
     throw new Error("Failed to fetch materials by category");
-  }
-}
-
-// Seed materials data - for initial setup or development
-export async function seedMaterialsData(materials: MaterialFormData[]) {
-  try {
-    return await transaction(async (client) => {
-      const results = [];
-
-      for (const material of materials) {
-        // Generate a unique material_id based on name
-        const materialId = generateMaterialId(material.name);
-
-        // Insert material into database
-        const result = await client.query(
-          `
-          INSERT INTO materials (
-            material_id, 
-            name, 
-            description, 
-            category,
-            density, 
-            melting_point, 
-            boiling_point, 
-            ignite_point,
-            impact_yield, 
-            impact_fracture, 
-            shear_yield, 
-            shear_fracture,
-            hardness, 
-            sharpness, 
-            durability,
-            color,
-            color_hex,
-            is_magical,
-            is_rare,
-            value_modifier,
-            source_location,
-            source_creature,
-            source_plant
-          ) VALUES (
-            $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 
-            $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23
-          ) RETURNING id
-        `,
-          [
-            materialId,
-            material.name,
-            material.description,
-            material.category,
-            material.density,
-            material.meltingPoint,
-            material.boilingPoint,
-            material.ignitePoint,
-            material.impactYield,
-            material.impactFracture,
-            material.shearYield,
-            material.shearFracture,
-            material.hardness,
-            material.sharpness,
-            material.durability,
-            material.color,
-            material.colorHex,
-            material.isMagical || false,
-            material.isRare || false,
-            material.valueModifier || 1.0,
-            material.sourceLocation,
-            material.sourceCreature,
-            material.sourcePlant,
-          ]
-        );
-
-        const materialDbId = result.rows[0].id;
-
-        // Insert properties if provided
-        if (material.properties && material.properties.length > 0) {
-          for (const prop of material.properties) {
-            await client.query(
-              `
-              INSERT INTO material_properties (material_id, property_name, property_value)
-              VALUES ($1, $2, $3)
-            `,
-              [materialDbId, prop.name, prop.value]
-            );
-          }
-        }
-
-        // Insert states if provided
-        if (material.states && material.states.length > 0) {
-          for (const state of material.states) {
-            await client.query(
-              `
-              INSERT INTO material_states (material_id, state_name, state_description, state_color)
-              VALUES ($1, $2, $3, $4)
-            `,
-              [materialDbId, state.state, state.description, state.color]
-            );
-          }
-        }
-
-        results.push({ id: materialId, name: material.name });
-      }
-
-      // Revalidate pages
-      revalidatePath("/materials");
-
-      return { success: true, materials: results };
-    });
-  } catch (error) {
-    console.error("Error seeding materials data:", error);
-    throw new Error("Failed to seed materials data");
   }
 }
