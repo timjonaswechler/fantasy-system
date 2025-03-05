@@ -1,144 +1,38 @@
-// src/app/users/page.tsx
-import { getUsers } from "@/actions/users";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCaption,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+"use client";
 
-// Server Actions in separaten Funktionen
-import { createUser, deleteUser } from "@/actions/users";
+import { useState } from "react";
+import { FileUploadDialog } from "@/components/ui/file-upload-dialog";
 
-// Kein "handleCreateUser" mehr notwendig, da createUser bereits ein Server Action ist
+export default function FileUploadExample() {
+  const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
 
-export default async function UsersPage() {
-  // Daten von Server Action laden
-  const users = await getUsers();
+  const handleFilesConfirmed = (files: File[]) => {
+    setUploadedFiles(files);
+
+    // Hier kannst du mit den Dateien arbeiten:
+    // - In eine Datenbank speichern
+    // - Zur weiteren Verarbeitung verwenden
+    // - Analysieren, usw.
+
+    console.log("Dateien bestätigt:", files);
+  };
 
   return (
-    <div className="container mx-auto py-10">
-      <h1 className="text-3xl font-bold mb-8">Benutzerverwaltung</h1>
+    <div className="p-8">
+      <h1 className="text-2xl font-bold mb-6">Datei-Upload Beispiel</h1>
 
-      {/* Formular zum Erstellen eines neuen Benutzers */}
-      <Card className="mb-8">
-        <CardHeader>
-          <CardTitle>Neuen Benutzer erstellen</CardTitle>
-          <CardDescription>
-            Füge einen neuen Benutzer zur Datenbank hinzu
-          </CardDescription>
-        </CardHeader>
-        <form action={createUser}>
-          <CardContent className="space-y-4">
-            <div>
-              <label
-                htmlFor="name"
-                className="block text-sm font-medium text-gray-700 mb-1"
-              >
-                Name
-              </label>
-              <Input
-                id="name"
-                name="name"
-                placeholder="Name eingeben"
-                required
-              />
-            </div>
-            <div>
-              <label
-                htmlFor="email"
-                className="block text-sm font-medium text-gray-700 mb-1"
-              >
-                E-Mail
-              </label>
-              <Input
-                id="email"
-                name="email"
-                type="email"
-                placeholder="E-Mail eingeben"
-                required
-              />
-            </div>
-          </CardContent>
-          <CardFooter>
-            <Button type="submit">Benutzer erstellen</Button>
-          </CardFooter>
-        </form>
-      </Card>
-
-      {/* Tabelle mit Benutzerdaten */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Benutzerliste</CardTitle>
-          <CardDescription>Alle Benutzer in der Datenbank</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableCaption>Liste aller registrierten Benutzer</TableCaption>
-            <TableHeader>
-              <TableRow>
-                <TableHead>ID</TableHead>
-                <TableHead>Name</TableHead>
-                <TableHead>E-Mail</TableHead>
-                <TableHead>Erstellt am</TableHead>
-                <TableHead>Aktionen</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {users.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={5} className="text-center">
-                    Keine Benutzer gefunden
-                  </TableCell>
-                </TableRow>
-              ) : (
-                users.map((user) => (
-                  <TableRow key={user.id}>
-                    <TableCell>{user.id}</TableCell>
-                    <TableCell>{user.name}</TableCell>
-                    <TableCell>{user.email}</TableCell>
-                    <TableCell>
-                      {new Date(user.created_at).toLocaleDateString()}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex space-x-2">
-                        <Button variant="outline" size="sm" asChild>
-                          <a href={`/users/${user.id}`}>Bearbeiten</a>
-                        </Button>
-                        <form>
-                          <Button
-                            variant="destructive"
-                            size="sm"
-                            formAction={async () => {
-                              "use server";
-                              await deleteUser(user.id);
-                            }}
-                          >
-                            Löschen
-                          </Button>
-                        </form>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+      <FileUploadDialog
+        maxSize={5 * 1024 * 1024} // 5MB
+        maxFileCount={10}
+        multiple={true}
+        accept={{
+          "plain/text": [".tsx"],
+        }}
+        buttonText="Dateien auswählen"
+        dialogTitle="Dateien hochladen"
+        dialogDescription="Wähle PDF oder Excel-Dateien zum Importieren"
+        onConfirm={handleFilesConfirmed}
+      />
     </div>
   );
 }
