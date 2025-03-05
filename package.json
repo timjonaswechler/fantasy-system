@@ -9,8 +9,12 @@
     "lint": "next lint",
     "stop": "brew services stop postgresql@15",
     "migrate": "node scripts/migrate.js",
-    "seed-weapons": "node scripts/seed-weapons.js",
-    "reset-weapons": "npm run migrate && npm run seed-weapons"
+    "seed": "node scripts/seed.js",
+    "seed:weapons": "node scripts/seed.js weapons",
+    "seed:materials": "node scripts/seed.js materials",
+    "db:clean": "node scripts/clean-db.js",
+    "db:reset": "node scripts/clean-db.js --force && node scripts/migrate.js && node scripts/seed.js",
+    "db:migrate": "node scripts/migrate.js"
   },
   "dependencies": {
     "@hookform/resolvers": "^4.1.2",
