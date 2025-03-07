@@ -1,7 +1,7 @@
 // src/components/materials/import-materials-dialog.tsx
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { toast } from "sonner";
 import { Upload } from "lucide-react";
 
@@ -16,6 +16,10 @@ interface ImportMaterialsDialogProps {
 export function ImportMaterialsDialog({
   onSuccess,
 }: ImportMaterialsDialogProps) {
+  // Reference to the FileUploadDialog to reset it
+  const dialogRef = useRef<{ reset: () => void } | null>(null);
+  const [open, setOpen] = useState(false);
+
   // Handle file import
   const handleFilesConfirmed = async (files: File[]) => {
     if (!files.length) {
@@ -68,6 +72,10 @@ export function ImportMaterialsDialog({
             successCount > 1 ? "ien" : ""
           } erfolgreich importiert`
         );
+
+        // Clear the file list by closing the dialog
+        setOpen(false);
+
         if (onSuccess) {
           // Give the database a moment to process before refreshing
           setTimeout(onSuccess, 500);
@@ -78,6 +86,10 @@ export function ImportMaterialsDialog({
             successCount > 1 ? "ien" : ""
           } importiert, ${errorCount} fehlgeschlagen`
         );
+
+        // Clear the file list by closing the dialog
+        setOpen(false);
+
         if (onSuccess) {
           setTimeout(onSuccess, 500);
         }
@@ -122,6 +134,8 @@ export function ImportMaterialsDialog({
       dialogTitle="Dateien hochladen"
       dialogDescription="Wähle JSON-Dateien mit Materialdaten zum Importieren"
       onConfirm={handleFilesConfirmed}
+      open={open}
+      onOpenChange={setOpen}
     />
   );
 }

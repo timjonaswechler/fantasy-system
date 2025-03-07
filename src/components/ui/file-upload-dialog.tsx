@@ -1,3 +1,4 @@
+// src/components/ui/file-upload-dialog.tsx
 "use client";
 
 import * as React from "react";
@@ -64,6 +65,16 @@ interface FileUploadDialogProps {
    * @param files The selected files
    */
   onConfirm?: (files: File[]) => void;
+
+  /**
+   * Controlled open state
+   */
+  open?: boolean;
+
+  /**
+   * Function to be called when open state changes
+   */
+  onOpenChange?: (open: boolean) => void;
 }
 
 export function FileUploadDialog({
@@ -75,20 +86,35 @@ export function FileUploadDialog({
   dialogTitle = "Dateien hochladen",
   dialogDescription = "Ziehe Dateien hierher oder klicke, um Dateien auszuwählen",
   onConfirm,
+  open: controlledOpen,
+  onOpenChange: setControlledOpen,
 }: FileUploadDialogProps) {
   const [files, setFiles] = React.useState<File[]>([]);
-  const [open, setOpen] = React.useState(false);
+  const [internalOpen, setInternalOpen] = React.useState(false);
+
+  // Determine if the component is controlled or uncontrolled
+  const isControlled = controlledOpen !== undefined;
+  const open = isControlled ? controlledOpen : internalOpen;
+  const setOpen = isControlled ? setControlledOpen : setInternalOpen;
+
+  // Reset files when dialog is closed
+  React.useEffect(() => {
+    if (!open) {
+      setFiles([]);
+    }
+  }, [open]);
 
   const handleConfirm = () => {
     if (onConfirm && files.length > 0) {
       onConfirm(files);
     }
-    setOpen(false);
+    // We don't close the dialog here anymore,
+    // as the parent component will handle it after processing
   };
 
   const handleCancel = () => {
     setFiles([]);
-    setOpen(false);
+    setOpen?.(false);
   };
 
   return (
@@ -99,12 +125,12 @@ export function FileUploadDialog({
           {buttonText}
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="sm:max-w-md md:max-w-lg">
         <DialogHeader>
           <DialogTitle>{dialogTitle}</DialogTitle>
           <DialogDescription>{dialogDescription}</DialogDescription>
         </DialogHeader>
-        <div className="flex flex-col gap-4 p-2 ">
+        <div className="flex flex-col gap-4 py-4">
           <FileUploader
             value={files}
             onValueChange={setFiles}
