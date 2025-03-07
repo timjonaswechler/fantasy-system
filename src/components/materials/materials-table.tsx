@@ -139,6 +139,8 @@ export function MaterialsTable({
   const [columnVisibility, setColumnVisibility] =
     React.useState<VisibilityState>({
       description: false,
+      density: false,
+      valueModifier: false,
     });
   const [rowSelection, setRowSelection] = React.useState<RowSelectionState>({});
   const [pagination, setPagination] = React.useState({

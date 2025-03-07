@@ -97,22 +97,6 @@ export function getColumns({
       enableHiding: false,
     },
     {
-      accessorKey: "description",
-      header: ({ column }) => (
-        <DataTableColumnHeader column={column} title="Beschreibung" />
-      ),
-      cell: ({ row }) => {
-        return (
-          <div className="flex items-center space-x-2">
-            <span className="max-w-[31.25rem] truncate text-sm text-muted">
-              {row.getValue("description") || "N/A"}
-            </span>
-          </div>
-        );
-      },
-      enableHiding: true,
-    },
-    {
       accessorKey: "category",
       header: ({ column }) => (
         <DataTableColumnHeader column={column} title="Kategorie" />
@@ -146,20 +130,6 @@ export function getColumns({
         return (
           <div className="flex items-center">
             <span>{density.toFixed(1)}</span>
-          </div>
-        );
-      },
-    },
-    {
-      accessorKey: "impactFracture",
-      header: ({ column }) => (
-        <DataTableColumnHeader column={column} title="Bruchfestigkeit" />
-      ),
-      cell: ({ row }) => {
-        const impactFracture = row.original.impactFracture;
-        return (
-          <div className="flex items-center">
-            <span>{impactFracture.toFixed(1)}</span>
           </div>
         );
       },
@@ -199,71 +169,6 @@ export function getColumns({
             <span>{quality.toFixed(0)}</span>
           </div>
         );
-      },
-    },
-    {
-      accessorKey: "isMetal",
-      header: ({ column }) => (
-        <DataTableColumnHeader column={column} title="Ist Metall" />
-      ),
-      cell: ({ row }) => {
-        return <span>{row.original.isMetal ? "Ja" : "Nein"}</span>;
-      },
-      enableHiding: true,
-      meta: {
-        filterVariant: "checkbox",
-      },
-    },
-    {
-      accessorKey: "isStone",
-      header: ({ column }) => (
-        <DataTableColumnHeader column={column} title="Ist Stein" />
-      ),
-      cell: ({ row }) => {
-        return <span>{row.original.isStone ? "Ja" : "Nein"}</span>;
-      },
-      enableHiding: true,
-      meta: {
-        filterVariant: "checkbox",
-      },
-    },
-    {
-      accessorKey: "isGem",
-      header: ({ column }) => (
-        <DataTableColumnHeader column={column} title="Ist Edelstein" />
-      ),
-      cell: ({ row }) => {
-        return <span>{row.original.isGem ? "Ja" : "Nein"}</span>;
-      },
-      enableHiding: true,
-      meta: {
-        filterVariant: "checkbox",
-      },
-    },
-    {
-      accessorKey: "isOrganic",
-      header: ({ column }) => (
-        <DataTableColumnHeader column={column} title="Ist Organisch" />
-      ),
-      cell: ({ row }) => {
-        return <span>{row.original.isOrganic ? "Ja" : "Nein"}</span>;
-      },
-      enableHiding: true,
-      meta: {
-        filterVariant: "checkbox",
-      },
-    },
-    {
-      accessorKey: "isFabric",
-      header: ({ column }) => (
-        <DataTableColumnHeader column={column} title="Ist Stoff" />
-      ),
-      cell: ({ row }) => {
-        return <span>{row.original.isFabric ? "Ja" : "Nein"}</span>;
-      },
-      enableHiding: true,
-      meta: {
-        filterVariant: "checkbox",
       },
     },
     {
