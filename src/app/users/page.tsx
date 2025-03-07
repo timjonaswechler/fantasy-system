@@ -23,10 +23,12 @@ export default function FileUploadExample() {
 
       <FileUploadDialog
         maxSize={5 * 1024 * 1024} // 5MB
-        maxFileCount={10}
+        maxFileCount={10} // Unbegrenzt
         multiple={true}
         accept={{
           "plain/text": [".tsx"],
+          //pdf
+          "application/pdf": [".pdf"],
         }}
         buttonText="Dateien auswählen"
         dialogTitle="Dateien hochladen"

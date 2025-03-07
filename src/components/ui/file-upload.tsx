@@ -99,12 +99,12 @@ export function FileUploadDialog({
           {buttonText}
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="sm:max-w-md md:max-w-lg">
         <DialogHeader>
           <DialogTitle>{dialogTitle}</DialogTitle>
           <DialogDescription>{dialogDescription}</DialogDescription>
         </DialogHeader>
-        <div className="flex flex-col gap-4 p-2 ">
+        <div className="flex flex-col gap-4 py-4">
           <FileUploader
             value={files}
             onValueChange={setFiles}
@@ -113,6 +113,33 @@ export function FileUploadDialog({
             accept={accept}
             multiple={multiple}
           />
+
+          {files.length > 0 && (
+            <div className="mt-4">
+              <h4 className="mb-2 font-medium">
+                Ausgewählte Dateien ({files.length})
+              </h4>
+              <ScrollArea className="h-full max-h-40 w-full rounded-md border">
+                <div className="p-4">
+                  {files.map((file, index) => (
+                    <div
+                      key={index}
+                      className="flex items-center justify-between py-2"
+                    >
+                      <div className="flex items-center">
+                        <div className="ml-2">
+                          <p className="text-sm font-medium">{file.name}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {(file.size / 1024).toFixed(2)} KB
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </ScrollArea>
+            </div>
+          )}
         </div>
         <DialogFooter className="flex flex-row justify-between sm:justify-between">
           <Button variant="outline" onClick={handleCancel}>

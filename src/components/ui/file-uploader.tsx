@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Image from "next/image";
-import { FileText, Upload, Trash } from "lucide-react";
+import { FileText, Trash2Icon, Upload, X } from "lucide-react";
 import Dropzone, {
   type DropzoneProps,
   type FileRejection,
@@ -239,7 +239,7 @@ export function FileUploader(props: FileUploaderProps) {
   const isDisabled = disabled || (files?.length ?? 0) >= maxFileCount;
 
   return (
-    <div className="relative flex flex-col gap-6 p-4 overflow-hidden">
+    <div className="relative flex flex-col gap-4">
       <Dropzone
         onDrop={onDrop}
         accept={accept}
@@ -252,13 +252,12 @@ export function FileUploader(props: FileUploaderProps) {
           <div
             {...getRootProps()}
             className={cn(
-              "group relative grid h-52 w-full cursor-pointer place-items-center rounded-lg border-1 border-dashed border-muted-foreground/50 px-5 py-2.5 text-center transition hover:bg-muted/25",
-              "focus-visible:outline-4",
-              isDragActive &&
-                "border-blue-500 bg-blue-50 outline-4 outline-blue-300",
+              "group relative grid h-52 w-full cursor-pointer place-items-center rounded-lg border-2 border-dashed border-muted-foreground/25 py-2.5 text-center transition hover:bg-muted/25",
+              "ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+              isDragActive && "border-blue-500 bg-blue-50 ring-4 ring-blue-300",
               isGlobalDragActive &&
                 !isDragActive &&
-                "border-muted-foreground hover:bg-muted",
+                "border-muted-foreground/50 hover:bg-muted/25",
               isDisabled && "pointer-events-none opacity-60",
               className
             )}
@@ -266,32 +265,31 @@ export function FileUploader(props: FileUploaderProps) {
           >
             <input {...getInputProps()} />
             {isDragActive ? (
-              <div className="flex flex-col items-center justify-center gap-4 sm:px-5">
+              <div className="flex flex-col items-center  justify-center h-full gap-4 sm:px-5">
                 <Upload className="size-7 text-blue-500" aria-hidden="true" />
-
-                <div className="flex flex-col gap-px">
-                  <p className="font-medium  text-blue-600">
+                <div className="flex flex-col gap-px ">
+                  <p className="font-medium text-blue-600">
                     Drag {`'n'`} drop files here, or click to select files
                   </p>
-                  <p className="text-sm  text-blue-600/70">
+                  <p className="text-sm  text-blue-600">
                     You can upload
                     {maxFileCount > 1
                       ? ` ${
                           maxFileCount === Infinity ? "multiple" : maxFileCount
                         }
-                    files (up to ${formatBytes(maxSize)} each)`
+                      files (up to ${formatBytes(maxSize)} each)`
                       : ` a file with ${formatBytes(maxSize)}`}
                   </p>
                 </div>
               </div>
             ) : (
-              <div className="flex flex-col items-center justify-center gap-4 sm:px-5">
+              <div className="flex flex-col items-center  justify-center h-full gap-4 sm:px-5">
                 <Upload
-                  className="size-7 text-muted-foreground"
+                  className="size-7 text-muted-foreground "
                   aria-hidden="true"
                 />
 
-                <div className="flex flex-col gap-px">
+                <div className="flex flex-col gap-px ">
                   <p className="font-medium text-muted-foreground">
                     Drag {`'n'`} drop files here, or click to select files
                   </p>
@@ -311,8 +309,8 @@ export function FileUploader(props: FileUploaderProps) {
         )}
       </Dropzone>
       {files?.length ? (
-        <ScrollArea className="h-fit w-full px-3">
-          <div className="flex max-h-48 flex-col gap-4">
+        <ScrollArea className="max-h-full w-full px-3">
+          <div className="flex max-h-80 flex-col gap-4">
             {files?.map((file, index) => (
               <FileCard
                 key={index}
@@ -351,15 +349,15 @@ function FileCard({ file, progress, onRemove }: FileCardProps) {
           {progress ? <Progress value={progress} /> : null}
         </div>
       </div>
-      <div className="flex items-center p-1 gap-2">
+      <div className="flex items-center gap-2">
         <Button
           type="button"
           variant="outline"
           size="icon"
-          className="size-7 bg-red-50 text-red-400 hover:bg-red-100 hover:text-red-500 border-1 border-red-400"
+          className="size-7"
           onClick={onRemove}
         >
-          <Trash className="size-4" aria-hidden="true" />
+          <Trash2Icon className="size-4" aria-hidden="true" />
           <span className="sr-only">Remove file</span>
         </Button>
       </div>
