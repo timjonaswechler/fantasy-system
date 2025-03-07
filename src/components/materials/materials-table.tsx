@@ -4,6 +4,8 @@
 import { IMaterial } from "@/types/material";
 import type { DataTableRowAction } from "@/types";
 import * as React from "react";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 
 import { DataTable } from "@/components/data-table/data-table";
 import { DataTableToolbar } from "@/components/data-table/data-table-toolbar";
@@ -27,18 +29,25 @@ import { MaterialUpdateSheet } from "./material-update-sheet";
 import { MaterialDetailSheet } from "./material-detail-sheet";
 import { MaterialCreateSheet } from "./material-create-sheet";
 import { MaterialCategory } from "@/types/material";
+import { getMaterials } from "@/actions/materials";
 
 interface MaterialsTableProps {
   materials: IMaterial[];
 }
 
-export function MaterialsTable({ materials }: MaterialsTableProps) {
+export function MaterialsTable({
+  materials: initialMaterials,
+}: MaterialsTableProps) {
+  const router = useRouter();
+  const [materials, setMaterials] =
+    React.useState<IMaterial[]>(initialMaterials);
   const [rowAction, setRowAction] =
     React.useState<DataTableRowAction<IMaterial> | null>(null);
   const [isDetailSheetOpen, setIsDetailSheetOpen] = React.useState(false);
   const [isCreateSheetOpen, setIsCreateSheetOpen] = React.useState(false);
   const [selectedMaterial, setSelectedMaterial] =
     React.useState<IMaterial | null>(null);
+  const [isRefreshing, setIsRefreshing] = React.useState(false);
 
   // Funktion zum Anzeigen der Material-Details
   const handleViewMaterial = (material: IMaterial) => {
@@ -62,8 +71,26 @@ export function MaterialsTable({ materials }: MaterialsTableProps) {
   };
 
   // Funktion zum Aktualisieren der Materialliste nach Änderungen
-  const handleRefresh = () => {
-    console.log("Aktualisiere Materialliste");
+  const handleRefresh = async () => {
+    if (isRefreshing) return;
+
+    setIsRefreshing(true);
+    try {
+      // Option 3: Laden der Daten ohne vollständige Seitenaktualisierung
+      const updatedMaterials = await getMaterials();
+      setMaterials(updatedMaterials);
+
+      // Tabelle zurücksetzen, um sicherzustellen, dass Sorting und Filtering korrekt angewendet werden
+      table.reset();
+
+      // Optional: Benachrichtigung bei Erfolg
+      toast.success("Materialliste aktualisiert");
+    } catch (error) {
+      console.error("Fehler beim Aktualisieren der Materialien:", error);
+      toast.error("Fehler beim Aktualisieren der Materialien");
+    } finally {
+      setIsRefreshing(false);
+    }
   };
 
   // Spalten mit View-Aktion
@@ -148,6 +175,7 @@ export function MaterialsTable({ materials }: MaterialsTableProps) {
           <MaterialsTableToolbarActions
             table={table}
             onCreateMaterial={handleCreateMaterial}
+            onImportSuccess={handleRefresh}
           />
         </DataTableToolbar>
       </DataTable>
@@ -181,6 +209,7 @@ export function MaterialsTable({ materials }: MaterialsTableProps) {
           }
         }}
         material={rowAction?.row.original ?? null}
+        onSuccess={handleRefresh}
       />
 
       {/* Material erstellen Sheet */}
