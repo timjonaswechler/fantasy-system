@@ -144,7 +144,6 @@ export function MaterialsTableToolbarActions({
 
       toast.error(`Import fehlgeschlagen: ${errorMessage}`);
     }
-    window.location.reload();
     // Kein window.location.reload() mehr!
     // Setze stattdessen einen Zustand, der signalisiert, dass der Import abgeschlossen ist
     setIsImporting(false);
