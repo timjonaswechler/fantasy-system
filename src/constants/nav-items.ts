@@ -1,3 +1,4 @@
+import { url } from "inspector";
 import { Bot, SquareTerminal, BookOpen, Settings2 } from "lucide-react";
 
 export const data = {
@@ -21,8 +22,8 @@ export const data = {
           url: "/materials",
         },
         {
-          title: "Settings",
-          url: "#",
+          title: "Characters",
+          url: "/characters",
         },
       ],
     },
