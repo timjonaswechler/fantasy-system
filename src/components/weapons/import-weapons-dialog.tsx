@@ -1,239 +1,136 @@
+// src/components/weapons/import-weapons-dialog.tsx
 "use client";
 
-import * as React from "react";
-import { Upload, Loader, AlertTriangle, CheckCircle2 } from "lucide-react";
+import { useState, useRef } from "react";
 import { toast } from "sonner";
+import { Upload } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import {
-  Drawer,
-  DrawerClose,
-  DrawerContent,
-  DrawerDescription,
-  DrawerFooter,
-  DrawerHeader,
-  DrawerTitle,
-  DrawerTrigger,
-} from "@/components/ui/drawer";
-import { useMediaQuery } from "@/hooks/use-media-query";
-import { cn } from "@/lib/utils";
+import { FileUploadDialog } from "@/components/ui/file-upload-dialog";
 import { importWeapons } from "@/actions/weapons-import";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
-interface ImportWeaponsDialogProps
-  extends React.ComponentPropsWithoutRef<typeof Dialog> {
+interface ImportWeaponsDialogProps {
   onSuccess?: () => void;
 }
 
-export function ImportWeaponsDialog({
-  onSuccess,
-  ...props
-}: ImportWeaponsDialogProps) {
-  const [isImporting, setIsImporting] = React.useState(false);
-  const [importStatus, setImportStatus] = React.useState<{
-    status: "idle" | "loading" | "success" | "error";
-    message?: string;
-  }>({ status: "idle" });
-  const [selectedFile, setSelectedFile] = React.useState<File | null>(null);
-  const fileInputRef = React.useRef<HTMLInputElement>(null);
-  const isDesktop = useMediaQuery("(min-width: 640px)");
+export function ImportWeaponsDialog({ onSuccess }: ImportWeaponsDialogProps) {
+  // Reference to the FileUploadDialog to reset it
+  const dialogRef = useRef<{ reset: () => void } | null>(null);
+  const [open, setOpen] = useState(false);
 
-  const resetState = () => {
-    setSelectedFile(null);
-    setImportStatus({ status: "idle" });
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
-    }
-  };
-
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0] || null;
-    setSelectedFile(file);
-    setImportStatus({ status: "idle" });
-  };
-
-  const handleImport = async () => {
-    if (!selectedFile) {
-      toast.error("Please select a file");
+  // Handle file import
+  const handleFilesConfirmed = async (files: File[]) => {
+    if (!files.length) {
+      toast.error("Please select at least one file");
       return;
     }
 
+    // Show loading toast
+    const loadingToast = toast.loading(
+      `Importing ${files.length} weapon${files.length > 1 ? "s" : ""}...`
+    );
+
     try {
-      setIsImporting(true);
-      setImportStatus({ status: "loading", message: "Importing weapons..." });
+      let successCount = 0;
+      let errorCount = 0;
+      let errorMessages: string[] = [];
 
-      // Read the file
-      const fileReader = new FileReader();
-      fileReader.onload = async (e) => {
-        const fileContent = e.target?.result as string;
+      // Process each file
+      for (const file of files) {
+        try {
+          // Read file content
+          const fileContent = await readFileAsText(file);
 
-        // Call the server action
-        const result = await importWeapons(fileContent);
+          // Import weapons
+          const result = await importWeapons(fileContent);
 
-        if (result.success) {
-          setImportStatus({
-            status: "success",
-            message: result.message,
-          });
-          // Call onSuccess after a delay to allow the user to see the success message
-          setTimeout(() => {
-            props.onOpenChange?.(false);
-            onSuccess?.();
-            resetState();
-          }, 1500);
-        } else {
-          setImportStatus({
-            status: "error",
-            message: result.message || "Failed to import weapons",
-          });
+          if (result.success) {
+            successCount++;
+          } else {
+            errorCount++;
+            errorMessages.push(`${file.name}: ${result.message}`);
+          }
+        } catch (error) {
+          errorCount++;
+          errorMessages.push(
+            `${file.name}: ${
+              error instanceof Error ? error.message : String(error)
+            }`
+          );
         }
-      };
+      }
 
-      fileReader.onerror = () => {
-        setImportStatus({
-          status: "error",
-          message: "Failed to read file",
-        });
-      };
+      // Dismiss loading toast
+      toast.dismiss(loadingToast);
 
-      fileReader.readAsText(selectedFile);
+      // Show appropriate toast based on results
+      if (successCount > 0 && errorCount === 0) {
+        toast.success(
+          `${successCount} weapon${
+            successCount > 1 ? "s" : ""
+          } successfully imported`
+        );
+
+        // Clear the file list by closing the dialog
+        setOpen(false);
+
+        if (onSuccess) {
+          // Give the database a moment to process before refreshing
+          setTimeout(onSuccess, 500);
+        }
+      } else if (successCount > 0) {
+        toast.warning(
+          `${successCount} weapon${
+            successCount > 1 ? "s" : ""
+          } imported, ${errorCount} failed`
+        );
+
+        // Clear the file list by closing the dialog
+        setOpen(false);
+
+        if (onSuccess) {
+          setTimeout(onSuccess, 500);
+        }
+      } else {
+        toast.error(`Import failed: ${errorMessages[0] || "Unknown error"}`);
+      }
     } catch (error) {
-      console.error("Error importing weapons:", error);
-      setImportStatus({
-        status: "error",
-        message:
-          error instanceof Error ? error.message : "Unknown error occurred",
-      });
-    } finally {
-      setIsImporting(false);
+      // Dismiss loading toast
+      toast.dismiss(loadingToast);
+
+      // Show error toast
+      toast.error(
+        `Import failed: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`
+      );
     }
   };
 
-  const DialogComponent = isDesktop ? Dialog : Drawer;
-  const DialogContentComponent = isDesktop ? DialogContent : DrawerContent;
-  const DialogTriggerComponent = isDesktop ? DialogTrigger : DrawerTrigger;
-  const DialogCloseComponent = isDesktop ? DialogClose : DrawerClose;
-  const DialogHeaderComponent = isDesktop ? DialogHeader : DrawerHeader;
-  const DialogFooterComponent = isDesktop ? DialogFooter : DrawerFooter;
-  const DialogTitleComponent = isDesktop ? DialogTitle : DrawerTitle;
-  const DialogDescriptionComponent = isDesktop
-    ? DialogDescription
-    : DrawerDescription;
+  // Helper function to read file as text
+  const readFileAsText = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const fileReader = new FileReader();
+      fileReader.onload = (e) => resolve(e.target?.result as string);
+      fileReader.onerror = () => reject(new Error("Error reading file"));
+      fileReader.readAsText(file);
+    });
+  };
 
   return (
-    <DialogComponent
-      {...props}
-      onOpenChange={(open) => {
-        if (!open) {
-          resetState();
-        }
-        props.onOpenChange?.(open);
+    <FileUploadDialog
+      maxSize={5 * 1024 * 1024} // 5MB
+      maxFileCount={10}
+      multiple={true}
+      accept={{
+        "application/json": [".json"],
       }}
-    >
-      <DialogTriggerComponent asChild>
-        <Button variant="outline" size="sm" className="gap-2">
-          <Upload className="size-4" aria-hidden="true" />
-          Import
-        </Button>
-      </DialogTriggerComponent>
-      <DialogContentComponent>
-        <DialogHeaderComponent>
-          <DialogTitleComponent>Import Weapons</DialogTitleComponent>
-          <DialogDescriptionComponent>
-            Upload a JSON file to import weapons into the database. The JSON
-            file should contain an array of weapon objects.
-          </DialogDescriptionComponent>
-        </DialogHeaderComponent>
-
-        <div className="grid gap-4 py-4">
-          <div className="grid gap-2">
-            <label htmlFor="file-upload" className="text-sm font-medium">
-              JSON File
-            </label>
-            <input
-              id="file-upload"
-              type="file"
-              accept=".json"
-              ref={fileInputRef}
-              onChange={handleFileChange}
-              className="cursor-pointer file:mr-4 file:cursor-pointer file:rounded-md file:border-0 file:bg-primary file:px-4 file:py-2 file:text-sm file:font-medium file:text-primary-foreground hover:file:bg-primary/90"
-            />
-            <p className="text-xs text-muted-foreground">
-              Only JSON files are accepted. Make sure your data is properly
-              formatted.
-            </p>
-          </div>
-
-          {selectedFile && (
-            <div className="rounded-md border border-border p-4">
-              <p className="font-medium">Selected file:</p>
-              <p className="text-sm">{selectedFile.name}</p>
-              <p className="text-xs text-muted-foreground">
-                {(selectedFile.size / 1024).toFixed(2)} KB
-              </p>
-            </div>
-          )}
-
-          {importStatus.status !== "idle" && (
-            <Alert
-              className={cn({
-                "border-yellow-600 text-yellow-600":
-                  importStatus.status === "loading",
-                "border-destructive text-destructive":
-                  importStatus.status === "error",
-                "border-green-600 text-green-600":
-                  importStatus.status === "success",
-              })}
-            >
-              {importStatus.status === "loading" && (
-                <Loader className="h-4 w-4 animate-spin" />
-              )}
-              {importStatus.status === "error" && (
-                <AlertTriangle className="h-4 w-4" />
-              )}
-              {importStatus.status === "success" && (
-                <CheckCircle2 className="h-4 w-4" />
-              )}
-              <AlertTitle>
-                {importStatus.status === "loading" && "Importing..."}
-                {importStatus.status === "error" && "Import Failed"}
-                {importStatus.status === "success" && "Import Successful"}
-              </AlertTitle>
-              <AlertDescription>{importStatus.message}</AlertDescription>
-            </Alert>
-          )}
-        </div>
-
-        <DialogFooterComponent className="gap-2 sm:space-x-0">
-          <DialogCloseComponent asChild>
-            <Button variant="outline">Cancel</Button>
-          </DialogCloseComponent>
-          <Button
-            onClick={handleImport}
-            disabled={
-              !selectedFile || isImporting || importStatus.status === "success"
-            }
-          >
-            {isImporting && (
-              <Loader
-                className="mr-2 h-4 w-4 animate-spin"
-                aria-hidden="true"
-              />
-            )}
-            Import
-          </Button>
-        </DialogFooterComponent>
-      </DialogContentComponent>
-    </DialogComponent>
+      buttonText="Import"
+      dialogTitle="Upload Files"
+      dialogDescription="Select JSON files with weapon data to import"
+      onConfirm={handleFilesConfirmed}
+      open={open}
+      onOpenChange={setOpen}
+    />
   );
 }

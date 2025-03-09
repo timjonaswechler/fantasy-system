@@ -1,8 +1,10 @@
+// src/components/weapons/weapons-table.tsx
 "use client";
 
-import { IWeapon } from "@/actions/weapons";
+import { IWeapon, getWeapons, getWeaponById } from "@/actions/weapons";
 import type { DataTableRowAction } from "@/types";
 import * as React from "react";
+import { toast } from "sonner";
 
 import { DataTable } from "@/components/data-table/data-table";
 import { DataTableToolbar } from "@/components/data-table/data-table-toolbar";
@@ -26,14 +28,13 @@ import { WeaponUpdateSheet } from "./weapon-update-sheet";
 import { WeaponDetailSheet } from "./weapon-detail-sheet";
 import { WeaponCreateSheet } from "./weapon-create-sheet";
 import { WeaponType, WeaponCategory, GraspType } from "@/types/weapon";
-import { Description } from "@radix-ui/react-dialog";
-import { Weight } from "lucide-react";
 
 interface WeaponsTableProps {
   weapons: IWeapon[];
 }
 
-export function WeaponsTable({ weapons }: WeaponsTableProps) {
+export function WeaponsTable({ weapons: initialWeapons }: WeaponsTableProps) {
+  const [weapons, setWeapons] = React.useState<IWeapon[]>(initialWeapons);
   const [rowAction, setRowAction] =
     React.useState<DataTableRowAction<IWeapon> | null>(null);
   const [isDetailSheetOpen, setIsDetailSheetOpen] = React.useState(false);
@@ -41,6 +42,7 @@ export function WeaponsTable({ weapons }: WeaponsTableProps) {
   const [selectedWeapon, setSelectedWeapon] = React.useState<IWeapon | null>(
     null
   );
+  const [isRefreshing, setIsRefreshing] = React.useState(false);
 
   // Function to handle viewing a weapon's details
   const handleViewWeapon = (weapon: IWeapon) => {
@@ -63,11 +65,27 @@ export function WeaponsTable({ weapons }: WeaponsTableProps) {
     setIsCreateSheetOpen(true);
   };
 
-  // Function to handle refreshing the weapons list (after changes)
-  const handleRefresh = () => {
-    // In a real app, you might want to refetch data from the server
-    // For now, we'll just log that we would refresh
-    console.log("Refreshing weapons list");
+  // Function to handle refreshing the weapons list after changes
+  const handleRefresh = async () => {
+    if (isRefreshing) return;
+
+    setIsRefreshing(true);
+    try {
+      // Load data without full page refresh
+      const updatedWeapons = await getWeapons();
+      setWeapons(updatedWeapons);
+
+      // Reset table to ensure sorting and filtering are correctly applied
+      table.reset();
+
+      // Optional: Success notification
+      toast.success("Weapons list updated");
+    } catch (error) {
+      console.error("Error refreshing weapons:", error);
+      toast.error("Failed to refresh weapons");
+    } finally {
+      setIsRefreshing(false);
+    }
   };
 
   // Custom columns with a view action added
@@ -218,6 +236,7 @@ export function WeaponsTable({ weapons }: WeaponsTableProps) {
           <WeaponsTableToolbarActions
             table={table}
             onCreateWeapon={handleCreateWeapon}
+            onImportSuccess={handleRefresh}
           />
         </DataTableToolbar>
       </DataTable>
@@ -247,7 +266,7 @@ export function WeaponsTable({ weapons }: WeaponsTableProps) {
         onOpenChange={(open) => {
           if (!open) {
             setRowAction(null);
-            handleRefresh(); // Call refresh when Sheet closes instead
+            handleRefresh(); // Call refresh when Sheet closes
           }
         }}
         weapon={rowAction?.row.original ?? null}
