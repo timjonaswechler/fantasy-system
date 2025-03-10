@@ -1,10 +1,8 @@
 import { System } from "@/engine/ecs";
 import { Entity, ComponentContainer } from "@/engine/ecs";
-import {
-  GoalsComponent,
-  AttributesComponent,
-  MemoryComponent,
-} from "@/engine/components/index";
+import { GoalsComponent } from "@/engine/components/goals-component";
+import { AttributesComponent } from "@/engine/components/attributes-component";
+import { MemoryComponent } from "@/engine/components/memory-component";
 
 // Goal-driven behavior system
 export class GoalSystem extends System {
@@ -57,11 +55,24 @@ export class GoalSystem extends System {
     // Generate goals based on needs, state, etc.
     const attributes = components.get(AttributesComponent);
     const curiosity = attributes.getAttribute("curiosity") || 0;
+    const charisma = attributes.getAttribute("charisma") || 0;
 
     // More curious entities have higher chance of creating exploration goals
     if (Math.random() * 100 < curiosity) {
       const goalsComponent = components.get(GoalsComponent);
-      goalsComponent.addGoal("explore_surroundings", 2);
+      // Don't add if they already have an exploration goal
+      if (!goalsComponent.goals.some((g) => g.id === "explore_surroundings")) {
+        goalsComponent.addGoal("explore_surroundings", 2);
+      }
+    }
+
+    // Charismatic entities want to socialize
+    if (Math.random() * 100 < charisma) {
+      const goalsComponent = components.get(GoalsComponent);
+      // Don't add if they already have a socialize goal
+      if (!goalsComponent.goals.some((g) => g.id === "socialize")) {
+        goalsComponent.addGoal("socialize", charisma > 75 ? 4 : 3); // Higher priority for very charismatic entities
+      }
     }
   }
 }

@@ -13,6 +13,7 @@ import { NeedSystem } from "@/engine/systems/need-system";
 import { RelationshipSystem } from "@/engine/systems/relationship-system";
 import { GoalSystem } from "@/engine/systems/goal-system";
 import { SpatialSystem } from "@/engine/systems/spatial-system";
+import { MovementSystem } from "@/engine/systems/movement-system";
 
 export class SimulationWorld {
   public ecs: ECS;

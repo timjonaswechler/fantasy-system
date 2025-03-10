@@ -25,6 +25,10 @@ export const data = {
           title: "Characters",
           url: "/characters",
         },
+        {
+          title: "Simulation",
+          url: "/simulation",
+        },
       ],
     },
     {

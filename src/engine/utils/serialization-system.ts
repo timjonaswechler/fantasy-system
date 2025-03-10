@@ -4,14 +4,12 @@ import {
   ComponentContainer,
   Component,
 } from "@/engine/ecs";
-import {
-  PositionComponent,
-  AttributesComponent,
-  NeedsComponent,
-  RelationshipsComponent,
-  GoalsComponent,
-  MemoryComponent,
-} from "@/engine/components/index";
+import { PositionComponent } from "@/engine/components/position-component";
+import { AttributesComponent } from "@/engine/components/attributes-component";
+import { NeedsComponent } from "@/engine/components/needs-component";
+import { RelationshipsComponent } from "@/engine/components/relationships-component";
+import { GoalsComponent } from "@/engine/components/goals-component";
+import { MemoryComponent } from "@/engine/components/memory-component";
 
 export class SerializationSystem {
   private ecs: ECS;
