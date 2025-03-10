@@ -189,12 +189,6 @@ const SimulationPage = () => {
 
           // Draw entity
           drawEntity(ctx, position.x, position.y, size, color, entityId);
-
-          // Draw needs if available
-          if (components.has(NeedsComponent)) {
-            const needs = components.get(NeedsComponent);
-            drawNeeds(ctx, position.x, position.y + size + 5, needs);
-          }
         }
       } catch (error) {
         // Entity might not exist anymore, skip
@@ -312,41 +306,6 @@ const SimulationPage = () => {
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.fillText(`${id}`, x, y);
-  };
-
-  // Draw needs indicators
-  const drawNeeds = (
-    ctx: CanvasRenderingContext2D,
-    x: number,
-    y: number,
-    needs: NeedsComponent
-  ) => {
-    const needsArray = Array.from(needs.needs.entries());
-
-    // Only draw if we have needs
-    if (needsArray.length === 0) return;
-
-    let offsetY = 0;
-
-    needsArray.forEach(([needName, needData]) => {
-      // Calculate percentage
-      const percentage = (needData.value / needData.maxValue) * 100;
-
-      // Choose color based on value
-      let color = "#4CAF50"; // Green
-      if (percentage < 30) color = "#F44336"; // Red
-      else if (percentage < 70) color = "#FFC107"; // Yellow
-
-      // Draw need bar background
-      ctx.fillStyle = "#EEEEEE";
-      ctx.fillRect(x - 15, y + offsetY, 30, 3);
-
-      // Draw need bar fill
-      ctx.fillStyle = color;
-      ctx.fillRect(x - 15, y + offsetY, 30 * (percentage / 100), 3);
-
-      offsetY += 5;
-    });
   };
 
   // Pause/resume the simulation
