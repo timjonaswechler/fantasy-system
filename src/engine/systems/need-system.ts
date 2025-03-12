@@ -4,6 +4,8 @@ import { NeedsComponent } from "@/engine/components/needs-component";
 import { AttributesComponent } from "@/engine/components/attributes-component";
 import { MemoryComponent } from "@/engine/components/memory-component";
 import { GoalsComponent } from "@/engine/components/goals-component";
+import { EventBus } from "@/engine/utils/event-bus";
+import { NeedCriticality } from "@/types/needs";
 
 // Enhanced Need system that handles need decay and focuses effects
 export class NeedSystem extends System {
@@ -11,13 +13,28 @@ export class NeedSystem extends System {
   private needCriticalThreshold = -10000; // Threshold for critical need state
   private memoryTimers: Map<string, number> = new Map(); // Track last time memory was created
   private tickCount: number = 0;
+  private eventBus: EventBus | null = null;
+
+  constructor(eventBus?: EventBus) {
+    super();
+    this.eventBus = eventBus || null;
+  }
 
   public update(entities: Set<Entity>): void {
     for (const entity of entities) {
       const components = this.ecs.getComponents(entity);
       const needsComponent = components.get(NeedsComponent);
 
-      // Apply attribute effects to needs
+      // Vorherige Kritikalitätswerte speichern für Event-Vergleich
+      const prevCriticalities = new Map<string, NeedCriticality>();
+      for (const [name, _] of needsComponent.needs.entries()) {
+        prevCriticalities.set(
+          name,
+          this.getNeedCriticality(name, needsComponent)
+        );
+      }
+
+      // ---- BESTEHENDER CODE: Attributbasierte Verfallsratenanpassung ----
       if (components.has(AttributesComponent)) {
         const attributesComponent = components.get(AttributesComponent);
 
@@ -82,7 +99,96 @@ export class NeedSystem extends System {
         // Default focus calculation if no attributes
         needsComponent.focus = needsComponent.calculateFocus();
       }
+      // ---- ENDE DES BESTEHENDEN CODES ----
+
+      // NEU: Kritikalitätsänderungen prüfen und Events auslösen
+      for (const [name, _] of needsComponent.needs.entries()) {
+        const prevCrit = prevCriticalities.get(name);
+        const currCrit = this.getNeedCriticality(name, needsComponent);
+
+        // Nur Events auslösen, wenn sich die Kritikalität geändert hat
+        if (prevCrit !== currCrit && this.eventBus) {
+          this.eventBus.publish("need:criticality_changed", {
+            entity,
+            needName: name,
+            criticality: currCrit,
+            previousCriticality: prevCrit,
+          });
+
+          // Besondere Behandlung für lebensgefährliche Bedürfnisse
+          if (currCrit === NeedCriticality.LIFE_THREATENING) {
+            this.eventBus.publish("need:life_threatening", {
+              entity,
+              needName: name,
+            });
+
+            // Memory-Eintrag für lebensgefährliche Bedürfnisse
+            if (components.has(MemoryComponent)) {
+              const memory = components.get(MemoryComponent);
+              memory.remember(
+                `Mein Bedürfnis nach ${name.toLowerCase()} ist lebensbedrohlich!`,
+                5
+              );
+            }
+          }
+        }
+      }
+
+      // Prüfen, ob ein kritisches Bedürfnis eine Zielgenerierung auslösen sollte
+      const criticalNeed = this.getMostCriticalNeed(needsComponent);
+      if (
+        criticalNeed &&
+        criticalNeed.criticality >= NeedCriticality.CRITICAL
+      ) {
+        // Memory-Eintrag für kritische Bedürfnisse
+        if (components.has(MemoryComponent) && Math.random() < 0.2) {
+          // Nicht zu oft speichern
+          const memory = components.get(MemoryComponent);
+          memory.remember(
+            `Ich muss dringend mein ${criticalNeed.name.toLowerCase()}-Bedürfnis befriedigen.`,
+            3
+          );
+        }
+      }
     }
+  }
+
+  // NEU: Hilfsmethode zur Bestimmung der Kritikalität eines Bedürfnisses
+  private getNeedCriticality(
+    needName: string,
+    needsComponent: NeedsComponent
+  ): NeedCriticality {
+    const need = needsComponent.needs.get(needName);
+    if (!need) return NeedCriticality.NORMAL;
+
+    if (need.value <= -50000) return NeedCriticality.LIFE_THREATENING;
+    if (need.value <= -10000) return NeedCriticality.CRITICAL;
+    if (need.value <= -1000) return NeedCriticality.CONCERNING;
+    return NeedCriticality.NORMAL;
+  }
+
+  // NEU: Hilfsmethode zur Bestimmung des kritischsten Bedürfnisses
+  private getMostCriticalNeed(
+    needsComponent: NeedsComponent
+  ): { name: string; criticality: NeedCriticality } | null {
+    let mostCriticalNeed: string | null = null;
+    let mostCriticalValue = Infinity;
+
+    for (const [name, need] of needsComponent.needs.entries()) {
+      if (need.value < mostCriticalValue) {
+        mostCriticalValue = need.value;
+        mostCriticalNeed = name;
+      }
+    }
+
+    if (mostCriticalNeed) {
+      return {
+        name: mostCriticalNeed,
+        criticality: this.getNeedCriticality(mostCriticalNeed, needsComponent),
+      };
+    }
+
+    return null;
   }
 
   /**

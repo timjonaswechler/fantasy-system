@@ -1,4 +1,5 @@
 import { Component } from "@/engine/ecs";
+import { NeedCriticality } from "@/types/needs";
 
 export type NeedState =
   | "Unfettered" // 400 to 300
@@ -156,5 +157,38 @@ export class NeedsComponent extends Component {
     if (focus >= 80) return -0.1; // -10% skill penalty
     if (focus >= 50) return -0.3; // -30% skill penalty
     return -0.5; // -50% skill penalty
+  }
+  public getNeedCriticality(needName: string): NeedCriticality {
+    const need = this.needs.get(needName);
+    if (!need) return NeedCriticality.NORMAL;
+
+    if (need.value <= -50000) return NeedCriticality.LIFE_THREATENING;
+    if (need.value <= -10000) return NeedCriticality.CRITICAL;
+    if (need.value <= -1000) return NeedCriticality.CONCERNING;
+    return NeedCriticality.NORMAL;
+  }
+
+  public getMostCriticalNeed(): {
+    name: string;
+    criticality: NeedCriticality;
+  } | null {
+    let mostCriticalNeed: string | null = null;
+    let mostCriticalValue = Infinity;
+
+    for (const [name, need] of this.needs.entries()) {
+      if (need.value < mostCriticalValue) {
+        mostCriticalValue = need.value;
+        mostCriticalNeed = name;
+      }
+    }
+
+    if (mostCriticalNeed) {
+      return {
+        name: mostCriticalNeed,
+        criticality: this.getNeedCriticality(mostCriticalNeed),
+      };
+    }
+
+    return null;
   }
 }
