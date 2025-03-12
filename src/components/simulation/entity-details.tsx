@@ -87,7 +87,6 @@ export function EntityDetails({ entity, world }: EntityDetailsPanelProps) {
               Social
             </TabsTrigger>
           </TabsList>
-
           {/* Attributes Tab */}
           <TabsContent value="attributes" className="mt-0">
             <Tabs defaultValue="physical">
@@ -192,101 +191,100 @@ export function EntityDetails({ entity, world }: EntityDetailsPanelProps) {
                     )}
                 </ScrollArea>
               </TabsContent>
-              {/* Needs Tab */}
-              <TabsContent value="needs" className="mt-0 p-4">
-                <ScrollArea className="h-[400px] pr-3">
-                  {details.needs &&
-                    details.needs.critical &&
-                    details.needs.critical.map((need: Need, index: number) => (
-                      <div key={index} className="mb-4">
-                        <div className="flex justify-between text-sm mb-1">
-                          <span className="font-medium">{need.name}</span>
-                          <span className={getNeedStateColor(need.state)}>
-                            {need.state}
-                          </span>
-                        </div>
-                        <Progress
-                          value={Math.max(0, need.value)}
-                          max={400}
-                          className="h-2"
-                        />
-                      </div>
-                    ))}
-                </ScrollArea>
-              </TabsContent>
-
-              {/* Goals Tab */}
-              <TabsContent value="goals" className="mt-0 p-4">
-                <ScrollArea className="h-[400px] pr-3">
-                  {details.goals && details.goals.length > 0 ? (
-                    details.goals.map(
-                      (
-                        goal: {
-                          id: string;
-                          priority: number;
-                          progress: number;
-                        },
-                        index: number
-                      ) => (
-                        <div key={index} className="mb-4">
-                          <div className="flex justify-between text-sm mb-1">
-                            <span className="font-medium">
-                              {goal.id.replace(/_/g, " ")}
-                            </span>
-                            <span>Priority: {goal.priority}</span>
-                          </div>
-                          <Progress
-                            value={goal.progress}
-                            max={100}
-                            className="h-2"
-                          />
-                        </div>
-                      )
-                    )
-                  ) : (
-                    <p className="text-muted-foreground">No active goals</p>
-                  )}
-                </ScrollArea>
-              </TabsContent>
-
-              {/* Social Tab */}
-              <TabsContent value="social" className="mt-0 p-4">
-                <ScrollArea className="h-[400px] pr-3">
-                  {details.relationships && details.relationships.length > 0 ? (
-                    details.relationships.map(
-                      (
-                        rel: { targetId: number; type: string; value: number },
-                        index: number
-                      ) => (
-                        <div
-                          key={index}
-                          className="flex items-center justify-between p-2 border rounded-md mb-2"
-                        >
-                          <div>
-                            <div className="font-medium">
-                              Entity #{rel.targetId}
-                            </div>
-                            <div
-                              className={getRelationshipColorClass(rel.value)}
-                            >
-                              {rel.type} ({rel.value > 0 ? "+" : ""}
-                              {rel.value})
-                            </div>
-                          </div>
-                          <div
-                            className={`w-3 h-3 rounded-full ${getRelationshipDotColor(
-                              rel.type
-                            )}`}
-                          ></div>
-                        </div>
-                      )
-                    )
-                  ) : (
-                    <p className="text-muted-foreground">No relationships</p>
-                  )}
-                </ScrollArea>
-              </TabsContent>
             </Tabs>
+          </TabsContent>
+
+          {/* Needs Tab */}
+          <TabsContent value="needs" className="mt-0 p-4">
+            <ScrollArea className="h-[400px] pr-3">
+              {details.needs &&
+                details.needs.critical &&
+                details.needs.critical.map((need: Need, index: number) => (
+                  <div key={index} className="mb-4">
+                    <div className="flex justify-between text-sm mb-1">
+                      <span className="font-medium">{need.name}</span>
+                      <span className={getNeedStateColor(need.state)}>
+                        {need.state}
+                      </span>
+                    </div>
+                    <Progress
+                      value={Math.max(0, need.value)}
+                      max={400}
+                      className="h-2"
+                    />
+                  </div>
+                ))}
+            </ScrollArea>
+          </TabsContent>
+
+          {/* Goals Tab */}
+          <TabsContent value="goals" className="mt-0 p-4">
+            <ScrollArea className="h-[400px] pr-3">
+              {details.goals && details.goals.length > 0 ? (
+                details.goals.map(
+                  (
+                    goal: {
+                      id: string;
+                      priority: number;
+                      progress: number;
+                    },
+                    index: number
+                  ) => (
+                    <div key={index} className="mb-4">
+                      <div className="flex justify-between text-sm mb-1">
+                        <span className="font-medium">
+                          {goal.id.replace(/_/g, " ")}
+                        </span>
+                        <span>Priority: {goal.priority}</span>
+                      </div>
+                      <Progress
+                        value={goal.progress}
+                        max={100}
+                        className="h-2"
+                      />
+                    </div>
+                  )
+                )
+              ) : (
+                <p className="text-muted-foreground">No active goals</p>
+              )}
+            </ScrollArea>
+          </TabsContent>
+
+          {/* Social Tab */}
+          <TabsContent value="social" className="mt-0">
+            <div className="h-[400px] pr-3">
+              {details.relationships && details.relationships.length > 0 ? (
+                details.relationships.map(
+                  (
+                    rel: { targetId: number; type: string; value: number },
+                    index: number
+                  ) => (
+                    <div
+                      key={index}
+                      className="flex items-center justify-between p-2 border rounded-md mb-2"
+                    >
+                      <div>
+                        <div className="font-medium">
+                          Entity #{rel.targetId}
+                        </div>
+                        <div className={getRelationshipColorClass(rel.value)}>
+                          {rel.type} ({rel.value > 0 ? "+" : ""}
+                          {rel.value})
+                        </div>
+                      </div>
+                      <div
+                        className={`w-3 h-3 rounded-full ${getRelationshipDotColor(
+                          rel.type
+                        )}`}
+                      ></div>
+                    </div>
+                  )
+                )
+              ) : (
+                <p className="text-muted-foreground">No relationships</p>
+              )}
+            </div>
           </TabsContent>
         </Tabs>
       </CardContent>
