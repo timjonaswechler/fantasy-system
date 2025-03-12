@@ -1,25 +1,34 @@
 import { Component } from "@/engine/ecs";
 
-// Goals and motivations
-export class GoalsComponent extends Component {
-  public goals: { id: string; priority: number; progress: number }[] = [];
+export interface Goal {
+  id: string;
+  priority: number;
+  progress: number;
+}
 
-  public addGoal(id: string, priority: number): void {
-    this.goals.push({ id, priority, progress: 0 });
-    this.goals.sort((a, b) => b.priority - a.priority); // Sort by priority (highest first)
+export class GoalsComponent implements Component {
+  public goals: Goal[] = [];
+
+  constructor() {
+    this.goals = [];
+  }
+
+  public addGoal(id: string, priority: number = 1): void {
+    // Check if goal already exists
+    if (this.hasGoal(id)) return;
+
+    this.goals.push({
+      id,
+      priority,
+      progress: 0,
+    });
   }
 
   public removeGoal(id: string): void {
-    const index = this.goals.findIndex((g) => g.id === id);
-    if (index >= 0) {
-      this.goals.splice(index, 1);
-    }
+    this.goals = this.goals.filter((goal) => goal.id !== id);
   }
 
-  public updateGoalProgress(id: string, progress: number): void {
-    const goal = this.goals.find((g) => g.id === id);
-    if (goal) {
-      goal.progress = progress;
-    }
+  public hasGoal(id: string): boolean {
+    return this.goals.some((goal) => goal.id === id);
   }
 }

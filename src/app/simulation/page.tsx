@@ -728,11 +728,7 @@ const SimulationPage = () => {
         <TabsContent value="details">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Entity details panel */}
-            <EntityDetails
-              entityId={selectedEntity}
-              ecs={worldRef.current?.ecs}
-            />
-
+            <EntityDetails entity={selectedEntity} world={worldRef.current} />
             {/* Instructions card */}
             <Card>
               <CardHeader>

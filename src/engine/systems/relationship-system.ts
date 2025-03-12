@@ -17,6 +17,14 @@ export class RelationshipSystem extends System {
   private interactionDistance: number = 40; // Distance at which entities can interact
   private eventBus?: EventBus;
 
+  // Creates a unique key for entity interactions that is the same regardless of entity order
+  private getInteractionKey = (entityA: Entity, entityB: Entity): string => {
+    // Sort entity IDs to ensure consistent keys regardless of parameter order
+    const id1 = String(entityA);
+    const id2 = String(entityB);
+    return id1 < id2 ? `${id1}_${id2}` : `${id2}_${id1}`;
+  };
+
   constructor(eventBus?: EventBus) {
     super();
     this.eventBus = eventBus;
@@ -76,6 +84,7 @@ export class RelationshipSystem extends System {
     }
   }
 
+  // Process interaction between entities
   private processInteraction(
     entityA: Entity,
     entityB: Entity,
@@ -83,70 +92,77 @@ export class RelationshipSystem extends System {
     componentsB: ComponentContainer,
     distance: number
   ): void {
-    // Get or initialize relationship between A and B
+    // Get relationships
     const relationsA = componentsA.get(RelationshipsComponent);
     const relationsB = componentsB.get(RelationshipsComponent);
 
+    // Get or initialize relationships
     let relationAtoB = relationsA.getRelationship(entityB);
     let relationBtoA = relationsB.getRelationship(entityA);
 
     // Initialize if not exist
     if (!relationAtoB) {
-      const initialRelationType = this.determineInitialRelationType(
-        componentsA,
-        componentsB
-      );
-      relationsA.addRelationship(entityB, initialRelationType, 0);
+      relationsA.addRelationship(entityB, "neutral", 0);
       relationAtoB = relationsA.getRelationship(entityB);
     }
 
     if (!relationBtoA) {
-      const initialRelationType = this.determineInitialRelationType(
-        componentsB,
-        componentsA
-      );
-      relationsB.addRelationship(entityA, initialRelationType, 0);
+      relationsB.addRelationship(entityA, "neutral", 0);
       relationBtoA = relationsB.getRelationship(entityA);
     }
 
-    // Determine interaction outcome based on entity attributes
-    const interactionValue = this.calculateInteractionValue(
-      entityA,
-      entityB,
-      componentsA,
-      componentsB,
-      relationAtoB!,
-      relationBtoA!
-    );
+    // Calculate interaction values with attribute modifiers
+    let valueAtoB = (Math.random() * 2 - 1) * 2; // -2 to +2 base
+    let valueBtoA = (Math.random() * 2 - 1) * 2;
 
-    // Update relationships with interaction results
-    relationsA.modifyRelationship(entityB, interactionValue.valueA);
-    relationsB.modifyRelationship(entityA, interactionValue.valueB);
+    // Apply social attribute effects if entities have attributes
+    if (
+      componentsA.has(AttributesComponent) &&
+      componentsB.has(AttributesComponent)
+    ) {
+      const attrsA = componentsA.get(AttributesComponent);
+      const attrsB = componentsB.get(AttributesComponent);
 
-    // Record interaction in memories if entities have memory
+      // Social attributes affect relationship changes
+      const empathyA = attrsA.getAttribute("EMPATHY");
+      const socialA = attrsA.getAttribute("SOCIAL_AWARENESS");
+      const empathyB = attrsB.getAttribute("EMPATHY");
+      const socialB = attrsB.getAttribute("SOCIAL_AWARENESS");
+
+      // Calculate modifiers (higher attributes = better at forming relationships)
+      const socialModA =
+        ((empathyA - 1000) / 1000) * 2 + ((socialA - 1000) / 1000) * 2;
+      const socialModB =
+        ((empathyB - 1000) / 1000) * 2 + ((socialB - 1000) / 1000) * 2;
+
+      // Apply to interaction values - entities with higher social skills
+      // make better impressions and are more receptive to others
+      valueAtoB += socialModB * 0.7 + socialModA * 0.3;
+      valueBtoA += socialModA * 0.7 + socialModB * 0.3;
+
+      // Existing relationship value influences new interactions
+      // (positive relationships tend to improve, negative tend to worsen)
+      valueAtoB += (relationAtoB?.value ?? 0) * 0.05;
+      valueBtoA += (relationBtoA?.value ?? 0) * 0.05;
+    }
+
+    // Update relationships
+    relationsA.modifyRelationship(entityB, valueAtoB);
+    relationsB.modifyRelationship(entityA, valueBtoA);
+
+    // Create memory of significant interactions
     this.recordInteractionMemory(
       entityA,
       entityB,
       componentsA,
       componentsB,
-      relationAtoB!.type,
-      interactionValue.valueA
+      relationAtoB?.type ?? "neutral",
+      valueAtoB
     );
 
-    // Create or modify relationship types based on value
-    this.updateRelationshipType(relationsA, entityB, relationAtoB!);
-    this.updateRelationshipType(relationsB, entityA, relationBtoA!);
-
-    // Emit interaction event if event bus exists
-    if (this.eventBus) {
-      this.eventBus.publish("entity:interaction", {
-        entityA,
-        entityB,
-        relationAtoB: relationAtoB!,
-        relationBtoA: relationBtoA!,
-        distance,
-      });
-    }
+    // Update relationship types based on new values
+    this.updateRelationshipType(relationsA, entityB);
+    this.updateRelationshipType(relationsB, entityA);
   }
 
   private determineInitialRelationType(
@@ -258,29 +274,25 @@ export class RelationshipSystem extends System {
     }
   }
 
+  // Set appropriate relationship type based on value
   private updateRelationshipType(
     relationships: RelationshipsComponent,
-    targetEntity: Entity,
-    currentRelation: { type: string; value: number }
+    targetEntity: Entity
   ): void {
-    // Update relationship type based on value
-    if (currentRelation.value > 50) {
+    const relation = relationships.getRelationship(targetEntity);
+    if (!relation) return;
+
+    // Update type based on value
+    if (relation.value > 50) {
       relationships.updateRelationshipType(targetEntity, "friend");
-    } else if (currentRelation.value > 20) {
+    } else if (relation.value > 20) {
       relationships.updateRelationshipType(targetEntity, "friendly");
-    } else if (currentRelation.value < -50) {
+    } else if (relation.value < -50) {
       relationships.updateRelationshipType(targetEntity, "enemy");
-    } else if (currentRelation.value < -20) {
+    } else if (relation.value < -20) {
       relationships.updateRelationshipType(targetEntity, "hostile");
     } else {
       relationships.updateRelationshipType(targetEntity, "neutral");
     }
-  }
-
-  private getInteractionKey(entityA: Entity, entityB: Entity): string {
-    // Create a unique key for this entity pair (order doesn't matter)
-    return entityA < entityB
-      ? `${entityA}-${entityB}`
-      : `${entityB}-${entityA}`;
   }
 }

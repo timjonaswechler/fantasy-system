@@ -1,25 +1,25 @@
+// EntityDetailsPanel.tsx
 import React from "react";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { Entity } from "@/engine/ecs";
-import { AttributesComponent } from "@/engine/components/attributes-component";
-import { NeedsComponent } from "@/engine/components/needs-component";
-import { PositionComponent } from "@/engine/components/position-component";
-import { GoalsComponent } from "@/engine/components/goals-component";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { MemoryComponent } from "@/engine/components/memory-component";
-import { RelationshipsComponent } from "@/engine/components/relationships-component";
-import { PersonalityComponent } from "@/engine/components/personality-component";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Entity } from "@/engine/ecs";
 
-interface EntityDetailsProps {
-  entityId: Entity | null;
-  ecs: any; // The ECS instance
+interface Need {
+  name: string;
+  state: string;
+  value: number;
 }
 
-export function EntityDetails({ entityId, ecs }: EntityDetailsProps) {
-  if (entityId === null || !ecs) {
+interface EntityDetailsPanelProps {
+  entity: Entity | null;
+  world: any; // SimulationWorld instance
+}
+
+export function EntityDetails({ entity, world }: EntityDetailsPanelProps) {
+  if (!entity || !world) {
     return (
       <Card>
         <CardHeader>
@@ -32,161 +32,205 @@ export function EntityDetails({ entityId, ecs }: EntityDetailsProps) {
     );
   }
 
-  try {
-    // Get all components for this entity
-    const components = ecs.getComponents(entityId);
+  // Get entity details from simulation world
+  const details = world.getEntityDetails(entity);
 
-    const hasAttributes = components.has(AttributesComponent);
-    const hasNeeds = components.has(NeedsComponent);
-    const hasPosition = components.has(PositionComponent);
-    const hasGoals = components.has(GoalsComponent);
-    const hasMemory = components.has(MemoryComponent);
-    const hasRelationships = components.has(RelationshipsComponent);
-    const hasPersonality = components.has(PersonalityComponent);
-
-    // Calculate focus if entity has needs
-    const focus = hasNeeds
-      ? components.get(NeedsComponent).calculateFocus()
-      : 100;
-    const focusDescription = hasNeeds
-      ? components.get(NeedsComponent).getFocusDescription(focus)
-      : "Untroubled";
-    const skillModifier = hasNeeds
-      ? components.get(NeedsComponent).getSkillModifier(focus)
-      : 0;
-
+  if (!details) {
     return (
-      <Card className="h-full">
-        <CardHeader className="pb-2">
-          <div className="flex justify-between items-center">
-            <CardTitle>Entity #{entityId}</CardTitle>
+      <Card>
+        <CardHeader>
+          <CardTitle>Entity Details</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-red-500">Error loading entity #{entity}</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card className="h-full">
+      <CardHeader className="pb-2">
+        <div className="flex justify-between items-center">
+          <CardTitle>Entity #{entity}</CardTitle>
+          {details.needs && (
             <Badge
               variant={
-                focus >= 120
+                details.needs.focus >= 120
                   ? "default"
-                  : focus >= 100
+                  : details.needs.focus >= 100
                   ? "outline"
-                  : focus >= 80
+                  : details.needs.focus >= 80
                   ? "secondary"
                   : "destructive"
               }
             >
-              {focusDescription}
+              {details.needs.focusDescription}
             </Badge>
-          </div>
-        </CardHeader>
+          )}
+        </div>
+      </CardHeader>
 
-        <CardContent className="p-0">
-          <Tabs defaultValue="details">
-            <TabsList className="w-full rounded-none border-b">
-              <TabsTrigger value="details" className="flex-1">
-                Details
-              </TabsTrigger>
-              <TabsTrigger value="needs" className="flex-1">
-                Needs
-              </TabsTrigger>
-              <TabsTrigger value="personality" className="flex-1">
-                Personality
-              </TabsTrigger>
-            </TabsList>
+      <CardContent className="p-0">
+        <Tabs defaultValue="attributes">
+          <TabsList className="w-full rounded-none border-b">
+            <TabsTrigger value="attributes" className="flex-1">
+              Attributes
+            </TabsTrigger>
+            <TabsTrigger value="needs" className="flex-1">
+              Needs
+            </TabsTrigger>
+            <TabsTrigger value="goals" className="flex-1">
+              Goals
+            </TabsTrigger>
+            <TabsTrigger value="social" className="flex-1">
+              Social
+            </TabsTrigger>
+          </TabsList>
 
-            <TabsContent value="details" className="mt-0 space-y-6">
-              {/* Position */}
-              {hasPosition && (
-                <div className="space-y-2">
-                  <h3 className="font-medium">Position</h3>
-                  <div className="grid grid-cols-2 gap-2 text-sm">
-                    <div>
-                      <span className="text-muted-foreground">X:</span>{" "}
-                      {components.get(PositionComponent).x.toFixed(2)}
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground">Y:</span>{" "}
-                      {components.get(PositionComponent).y.toFixed(2)}
-                    </div>
-                  </div>
-                </div>
-              )}
+          {/* Attributes Tab */}
+          <TabsContent value="attributes" className="mt-0">
+            <Tabs defaultValue="physical">
+              <TabsList className="w-full rounded-none border-b">
+                <TabsTrigger value="physical" className="flex-1">
+                  Physical
+                </TabsTrigger>
+                <TabsTrigger value="mental" className="flex-1">
+                  Mental
+                </TabsTrigger>
+                <TabsTrigger value="social" className="flex-1">
+                  Social
+                </TabsTrigger>
+              </TabsList>
 
-              {/* Focus */}
-              {hasNeeds && (
-                <div className="space-y-2">
-                  <h3 className="font-medium">Focus</h3>
-                  <div className="space-y-1">
-                    <div className="flex justify-between text-sm">
-                      <span>Level:</span>
-                      <span
-                        className={
-                          focus >= 140
-                            ? "text-green-600 font-medium"
-                            : focus >= 120
-                            ? "text-green-500"
-                            : focus >= 100
-                            ? "text-blue-500"
-                            : focus >= 80
-                            ? "text-yellow-500"
-                            : "text-red-500"
-                        }
-                      >
-                        {focus}% ({focusDescription})
-                      </span>
-                    </div>
-                    <Progress
-                      value={focus}
-                      max={140}
-                      className={`h-2 ${
-                        focus >= 140
-                          ? "bg-green-600"
-                          : focus >= 120
-                          ? "bg-green-500"
-                          : focus >= 100
-                          ? "bg-blue-500"
-                          : focus >= 80
-                          ? "bg-yellow-500"
-                          : "bg-red-500"
-                      }`}
-                    />
-                    <div className="text-xs text-muted-foreground mt-1">
-                      Skill Modifier: {skillModifier >= 0 ? "+" : ""}
-                      {Math.round(skillModifier * 100)}%
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Attributes */}
-              {hasAttributes && (
-                <div className="space-y-2">
-                  <h3 className="font-medium">Attributes</h3>
-                  <div className="space-y-2">
-                    {Array.from<[string, number]>(
-                      components.get(AttributesComponent).attributes.entries()
-                    )
-                      .filter(([name]) => !name.startsWith("base"))
-                      .map(([name, value]) => (
-                        <div key={name} className="space-y-1">
-                          <div className="flex justify-between text-sm">
-                            <span className="capitalize">{name}</span>
-                            <span>{value.toFixed(1)}</span>
+              {/* Physical Attributes */}
+              <TabsContent value="physical" className="mt-0 p-4">
+                <ScrollArea className="h-[400px] pr-3">
+                  {details.attributes &&
+                    details.attributes.physical &&
+                    Object.entries(details.attributes.physical).map(
+                      ([name, attr]: [string, any]) => (
+                        <div key={name} className="mb-4">
+                          <div className="flex justify-between text-sm mb-1">
+                            <span className="font-medium">
+                              {name.replace(/_/g, " ")}
+                            </span>
+                            <span
+                              className={getAttributeColorClass(attr.value)}
+                            >
+                              {attr.value}
+                              {attr.description && ` (${attr.description})`}
+                            </span>
                           </div>
-                          <Progress value={value} max={100} className="h-2" />
+                          <Progress
+                            value={attr.value}
+                            max={5000}
+                            className="h-2"
+                          />
                         </div>
-                      ))}
-                  </div>
-                </div>
-              )}
+                      )
+                    )}
+                </ScrollArea>
+              </TabsContent>
 
-              {/* Goals */}
-              {hasGoals && components.get(GoalsComponent).goals.length > 0 && (
-                <div className="space-y-2">
-                  <h3 className="font-medium">Goals</h3>
-                  <div className="space-y-2">
-                    {components
-                      .get(GoalsComponent)
-                      .goals.map((goal: any, index: number) => (
-                        <div key={index} className="space-y-1">
-                          <div className="flex justify-between text-sm">
-                            <span className="capitalize">
+              {/* Mental Attributes */}
+              <TabsContent value="mental" className="mt-0 p-4">
+                <ScrollArea className="h-[400px] pr-3">
+                  {details.attributes &&
+                    details.attributes.mental &&
+                    Object.entries(details.attributes.mental).map(
+                      ([name, attr]: [string, any]) => (
+                        <div key={name} className="mb-4">
+                          <div className="flex justify-between text-sm mb-1">
+                            <span className="font-medium">
+                              {name.replace(/_/g, " ")}
+                            </span>
+                            <span
+                              className={getAttributeColorClass(attr.value)}
+                            >
+                              {attr.value}
+                              {attr.description && ` (${attr.description})`}
+                            </span>
+                          </div>
+                          <Progress
+                            value={attr.value}
+                            max={5000}
+                            className="h-2"
+                          />
+                        </div>
+                      )
+                    )}
+                </ScrollArea>
+              </TabsContent>
+
+              {/* Social Attributes */}
+              <TabsContent value="social" className="mt-0 p-4">
+                <ScrollArea className="h-[400px] pr-3">
+                  {details.attributes &&
+                    details.attributes.social &&
+                    Object.entries(details.attributes.social).map(
+                      ([name, attr]: [string, any]) => (
+                        <div key={name} className="mb-4">
+                          <div className="flex justify-between text-sm mb-1">
+                            <span className="font-medium">
+                              {name.replace(/_/g, " ")}
+                            </span>
+                            <span
+                              className={getAttributeColorClass(attr.value)}
+                            >
+                              {attr.value}
+                              {attr.description && ` (${attr.description})`}
+                            </span>
+                          </div>
+                          <Progress
+                            value={attr.value}
+                            max={5000}
+                            className="h-2"
+                          />
+                        </div>
+                      )
+                    )}
+                </ScrollArea>
+              </TabsContent>
+              {/* Needs Tab */}
+              <TabsContent value="needs" className="mt-0 p-4">
+                <ScrollArea className="h-[400px] pr-3">
+                  {details.needs &&
+                    details.needs.critical &&
+                    details.needs.critical.map((need: Need, index: number) => (
+                      <div key={index} className="mb-4">
+                        <div className="flex justify-between text-sm mb-1">
+                          <span className="font-medium">{need.name}</span>
+                          <span className={getNeedStateColor(need.state)}>
+                            {need.state}
+                          </span>
+                        </div>
+                        <Progress
+                          value={Math.max(0, need.value)}
+                          max={400}
+                          className="h-2"
+                        />
+                      </div>
+                    ))}
+                </ScrollArea>
+              </TabsContent>
+
+              {/* Goals Tab */}
+              <TabsContent value="goals" className="mt-0 p-4">
+                <ScrollArea className="h-[400px] pr-3">
+                  {details.goals && details.goals.length > 0 ? (
+                    details.goals.map(
+                      (
+                        goal: {
+                          id: string;
+                          priority: number;
+                          progress: number;
+                        },
+                        index: number
+                      ) => (
+                        <div key={index} className="mb-4">
+                          <div className="flex justify-between text-sm mb-1">
+                            <span className="font-medium">
                               {goal.id.replace(/_/g, " ")}
                             </span>
                             <span>Priority: {goal.priority}</span>
@@ -197,369 +241,113 @@ export function EntityDetails({ entityId, ecs }: EntityDetailsProps) {
                             className="h-2"
                           />
                         </div>
-                      ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Memories */}
-              {hasMemory && (
-                <>
-                  <div className="space-y-2">
-                    <h3 className="font-medium">Short Term Memories</h3>
-                    {components.get(MemoryComponent).shortTermMemory.length >
-                    0 ? (
-                      <div className="space-y-1 text-sm">
-                        {components
-                          .get(MemoryComponent)
-                          .shortTermMemory.slice(-5)
-                          .reverse()
-                          .map((memory: any, index: number) => (
-                            <div key={index} className="p-2 border rounded-md">
-                              <div>{memory.event}</div>
-                              <div className="text-xs text-muted-foreground">
-                                {new Date(
-                                  memory.timestamp
-                                ).toLocaleTimeString()}
-                              </div>
-                            </div>
-                          ))}
-                      </div>
-                    ) : (
-                      <p className="text-sm text-muted-foreground">
-                        No memories recorded
-                      </p>
-                    )}
-                  </div>
-                  <div className="space-y-2">
-                    <h3 className="font-medium">Long Term Memories</h3>
-                    {components.get(MemoryComponent).longTermMemory.length >
-                    0 ? (
-                      <div className="space-y-1 text-sm">
-                        {components
-                          .get(MemoryComponent)
-                          .longTermMemory.slice()
-                          .reverse()
-                          .map((memory: any, index: number) => (
-                            <div key={index} className="p-2 border rounded-md">
-                              <div>{memory.event}</div>
-                              <div className="text-xs text-muted-foreground">
-                                {new Date(
-                                  memory.timestamp
-                                ).toLocaleTimeString()}
-                              </div>
-                            </div>
-                          ))}
-                      </div>
-                    ) : (
-                      <p className="text-sm text-muted-foreground">
-                        No memories recorded
-                      </p>
-                    )}
-                  </div>
-                </>
-              )}
-            </TabsContent>
-
-            <TabsContent value="needs" className="mt-0 space-y-6">
-              {/* Needs by Category */}
-              {hasNeeds && (
-                <>
-                  <div className="space-y-1">
-                    <h3 className="font-medium">Critical Needs</h3>
-                    {(
-                      components.get(NeedsComponent).getCriticalNeeds(3) as [
-                        string,
-                        any
-                      ][]
-                    ).map(([name, need]) => (
-                      <div
-                        key={name}
-                        className="p-2 border rounded-md space-y-1 mb-2"
-                      >
-                        <div className="flex justify-between text-sm">
-                          <span className="font-medium">{name}</span>
-                          <Badge
-                            variant={
-                              need.value >= 0
-                                ? "outline"
-                                : need.value >= -9999
-                                ? "secondary"
-                                : "destructive"
-                            }
-                            className="text-xs"
-                          >
-                            {components
-                              .get(NeedsComponent)
-                              .getNeedState(need.value)}
-                          </Badge>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <div className="w-2 h-2 rounded-full bg-red-500"></div>
-                          <span className="text-xs text-muted-foreground">
-                            {need.category}
-                          </span>
-                          <div className="flex-1"></div>
-                          <span className="text-xs font-medium">
-                            Priority: {need.priority}
-                          </span>
-                        </div>
-                        <Progress
-                          value={Math.max(0, need.value)}
-                          max={400}
-                          className="h-2 bg-red-100"
-                        />
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Physical Needs */}
-                  <div className="space-y-1">
-                    <h3 className="font-medium">Physical Needs</h3>
-                    {Array.from<[string, any]>(
-                      components
-                        .get(NeedsComponent)
-                        .getNeedsByCategory("Physical")
-                        .entries()
-                    ).map(([name, need]: [string, any]) => (
-                      <div
-                        key={name}
-                        className="p-2 border rounded-md space-y-1 mb-2"
-                      >
-                        <div className="flex justify-between text-sm">
-                          <span className="font-medium">{name}</span>
-                          <Badge
-                            variant={
-                              need.value >= 300
-                                ? "default"
-                                : need.value >= 100
-                                ? "outline"
-                                : need.value >= -999
-                                ? "secondary"
-                                : "destructive"
-                            }
-                            className="text-xs"
-                          >
-                            {components
-                              .get(NeedsComponent)
-                              .getNeedState(need.value)}
-                          </Badge>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <div className="w-2 h-2 rounded-full bg-blue-500"></div>
-                          <span className="text-xs text-muted-foreground">
-                            Physical
-                          </span>
-                          <div className="flex-1"></div>
-                          <span className="text-xs font-medium">
-                            Priority: {need.priority}
-                          </span>
-                        </div>
-                        <Progress
-                          value={Math.max(0, need.value)}
-                          max={400}
-                          className={`h-2 ${
-                            need.value >= 300
-                              ? "bg-green-500"
-                              : need.value >= 100
-                              ? "bg-blue-500"
-                              : need.value >= -999
-                              ? "bg-yellow-500"
-                              : need.value >= -9999
-                              ? "bg-orange-500"
-                              : "bg-red-500"
-                          }`}
-                        />
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Social Needs */}
-                  <div className="space-y-1">
-                    <h3 className="font-medium">Social Needs</h3>
-                    {Array.from<[string, any]>(
-                      components
-                        .get(NeedsComponent)
-                        .getNeedsByCategory("Social")
-                        .entries()
-                    ).map(([name, need]: [string, any]) => (
-                      <div
-                        key={name}
-                        className="p-2 border rounded-md space-y-1 mb-2"
-                      >
-                        <div className="flex justify-between text-sm">
-                          <span className="font-medium">{name}</span>
-                          <Badge
-                            variant={
-                              need.value >= 300
-                                ? "default"
-                                : need.value >= 100
-                                ? "outline"
-                                : need.value >= -999
-                                ? "secondary"
-                                : "destructive"
-                            }
-                            className="text-xs"
-                          >
-                            {components
-                              .get(NeedsComponent)
-                              .getNeedState(need.value)}
-                          </Badge>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <div className="w-2 h-2 rounded-full bg-green-500"></div>
-                          <span className="text-xs text-muted-foreground">
-                            Social
-                          </span>
-                          <div className="flex-1"></div>
-                          <span className="text-xs font-medium">
-                            Priority: {need.priority}
-                          </span>
-                        </div>
-                        <Progress
-                          value={Math.max(0, need.value)}
-                          max={400}
-                          className={`h-2 ${
-                            need.value >= 300
-                              ? "bg-green-500"
-                              : need.value >= 100
-                              ? "bg-blue-500"
-                              : need.value >= -999
-                              ? "bg-yellow-500"
-                              : need.value >= -9999
-                              ? "bg-orange-500"
-                              : "bg-red-500"
-                          }`}
-                        />
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Other categories could be added in the same pattern */}
-                </>
-              )}
-            </TabsContent>
-
-            <TabsContent value="personality" className="mt-0 space-y-6">
-              {hasPersonality ? (
-                <div className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    {Array.from<[string, number]>(
-                      components.get(PersonalityComponent).traits.entries()
+                      )
                     )
-                      .sort(([aName], [bName]) => aName.localeCompare(bName))
-                      .map(([name, value]) => (
-                        <div key={name} className="space-y-1">
-                          <div className="flex justify-between text-sm">
-                            <span className="capitalize">
-                              {name.replace(/_/g, " ").toLowerCase()}
-                            </span>
-                            <span
-                              className={
-                                value >= 75
-                                  ? "text-green-600 font-medium"
-                                  : value >= 60
-                                  ? "text-green-500"
-                                  : value >= 40
-                                  ? "text-blue-500"
-                                  : value >= 25
-                                  ? "text-yellow-500"
-                                  : "text-red-500"
-                              }
-                            >
-                              {components
-                                .get(PersonalityComponent)
-                                .getTraitDescription(name)}
-                            </span>
-                          </div>
-                          <Progress
-                            value={value}
-                            max={100}
-                            className={`h-2 ${
-                              value >= 75
-                                ? "bg-green-600"
-                                : value >= 60
-                                ? "bg-green-500"
-                                : value >= 40
-                                ? "bg-blue-500"
-                                : value >= 25
-                                ? "bg-yellow-500"
-                                : "bg-red-500"
-                            }`}
-                          />
-                        </div>
-                      ))}
-                  </div>
+                  ) : (
+                    <p className="text-muted-foreground">No active goals</p>
+                  )}
+                </ScrollArea>
+              </TabsContent>
 
-                  <div className="p-3 bg-slate-50 rounded-md mt-4">
-                    <h3 className="font-medium mb-2">Personality Summary</h3>
-                    <p className="text-sm text-muted-foreground">
-                      This entity{" "}
-                      {getPersonalitySummary(
-                        components.get(PersonalityComponent)
-                      )}
-                    </p>
-                  </div>
-                </div>
-              ) : (
-                <p className="text-muted-foreground">
-                  No personality data available
-                </p>
-              )}
-            </TabsContent>
-          </Tabs>
-        </CardContent>
-      </Card>
-    );
-  } catch (error) {
-    // Entity might not exist anymore
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle>Entity Details</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-red-500">Error loading entity #{entityId}</p>
-          <p className="text-xs text-muted-foreground">{String(error)}</p>
-        </CardContent>
-      </Card>
-    );
+              {/* Social Tab */}
+              <TabsContent value="social" className="mt-0 p-4">
+                <ScrollArea className="h-[400px] pr-3">
+                  {details.relationships && details.relationships.length > 0 ? (
+                    details.relationships.map(
+                      (
+                        rel: { targetId: number; type: string; value: number },
+                        index: number
+                      ) => (
+                        <div
+                          key={index}
+                          className="flex items-center justify-between p-2 border rounded-md mb-2"
+                        >
+                          <div>
+                            <div className="font-medium">
+                              Entity #{rel.targetId}
+                            </div>
+                            <div
+                              className={getRelationshipColorClass(rel.value)}
+                            >
+                              {rel.type} ({rel.value > 0 ? "+" : ""}
+                              {rel.value})
+                            </div>
+                          </div>
+                          <div
+                            className={`w-3 h-3 rounded-full ${getRelationshipDotColor(
+                              rel.type
+                            )}`}
+                          ></div>
+                        </div>
+                      )
+                    )
+                  ) : (
+                    <p className="text-muted-foreground">No relationships</p>
+                  )}
+                </ScrollArea>
+              </TabsContent>
+            </Tabs>
+          </TabsContent>
+        </Tabs>
+      </CardContent>
+    </Card>
+  );
+}
+
+// Helper functions for styling
+function getAttributeColorClass(value: number): string {
+  if (value >= 2000) return "text-green-600 font-semibold";
+  if (value >= 1500) return "text-green-500";
+  if (value >= 1250) return "text-blue-500";
+  if (value >= 1000) return "text-blue-400";
+  if (value >= 750) return "text-gray-500";
+  if (value >= 500) return "text-yellow-500";
+  if (value >= 250) return "text-orange-500";
+  return "text-red-500";
+}
+
+function getNeedStateColor(state: string): string {
+  switch (state) {
+    case "Unfettered":
+      return "text-green-600 font-semibold";
+    case "Level-headed":
+      return "text-green-500";
+    case "Untroubled":
+      return "text-blue-500";
+    case "Not distracted":
+      return "text-blue-400";
+    case "Unfocused":
+      return "text-yellow-500";
+    case "Distracted":
+      return "text-orange-500";
+    case "Badly distracted":
+      return "text-red-500";
+    default:
+      return "text-gray-500";
   }
 }
 
-// Helper function to generate a personality summary
-function getPersonalitySummary(personalityComponent: any): string {
-  const traits = personalityComponent.traits;
+function getRelationshipColorClass(value: number): string {
+  if (value >= 50) return "text-green-600";
+  if (value >= 20) return "text-green-500";
+  if (value > -20) return "text-gray-500";
+  if (value > -50) return "text-orange-500";
+  return "text-red-500";
+}
 
-  const highestTraits = Array.from<[string, number]>(traits.entries())
-    .filter(([_, value]) => value >= 75)
-    .sort(([_, aValue], [__, bValue]) => bValue - aValue)
-    .slice(0, 3)
-    .map(([name]) => name.replace(/_/g, " ").toLowerCase());
-
-  const lowestTraits = Array.from<[string, number]>(traits.entries())
-    .filter(([_, value]) => value <= 25)
-    .sort(([_, aValue], [__, bValue]) => aValue - bValue)
-    .slice(0, 3)
-    .map(([name]) => name.replace(/_/g, " ").toLowerCase());
-
-  let summary = "";
-
-  if (highestTraits.length > 0) {
-    summary += `has very high ${highestTraits.join(", ")}`;
+function getRelationshipDotColor(type: string): string {
+  switch (type) {
+    case "friend":
+      return "bg-green-600";
+    case "friendly":
+      return "bg-green-400";
+    case "neutral":
+      return "bg-gray-400";
+    case "hostile":
+      return "bg-orange-500";
+    case "enemy":
+      return "bg-red-600";
+    default:
+      return "bg-gray-300";
   }
-
-  if (highestTraits.length > 0 && lowestTraits.length > 0) {
-    summary += " and ";
-  }
-
-  if (lowestTraits.length > 0) {
-    summary += `has very low ${lowestTraits.join(", ")}`;
-  }
-
-  if (summary.length === 0) {
-    summary = "has a balanced personality with no extreme traits";
-  }
-
-  return summary + ".";
 }

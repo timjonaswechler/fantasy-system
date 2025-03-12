@@ -30,6 +30,7 @@ export interface Need {
 // Enhanced needs component that tracks entity's needs and calculates focus
 export class NeedsComponent extends Component {
   public needs: Map<string, Need> = new Map();
+  public focus: number = 100; // Default focus value
 
   constructor(needs: Record<string, Need> = {}) {
     super();

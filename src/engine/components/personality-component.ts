@@ -110,18 +110,34 @@ export const DEFAULT_PERSONALITY_TRAITS = [
 ];
 
 /**
- * Generate a random personality
- * @returns Record of personality traits
+ * Generate a random personality using a Gaussian distribution
+ * @returns Record of personality traits with values from 0-100
  */
 export function generateRandomPersonality(): Record<string, number> {
   const traits: Record<string, number> = {};
 
+  // Mean at 50 (center of 0-100 scale)
+  const mean = 50;
+  // Standard deviation of 15 gives a similar distribution to the original probability table
+  const stdDev = 15;
+
   for (const trait of DEFAULT_PERSONALITY_TRAITS) {
-    // Generate random value with normal distribution around 50
-    let value = 50 + (Math.random() + Math.random() + Math.random() - 1.5) * 33;
-    // Clamp between 0-100
-    value = Math.max(0, Math.min(100, Math.round(value)));
-    traits[trait] = value;
+    // Generate a normally distributed random number using Box-Muller transform
+    let u1 = Math.random();
+    let u2 = Math.random();
+    // Avoid log(0)
+    while (u1 === 0) u1 = Math.random();
+
+    const z0 = Math.sqrt(-2.0 * Math.log(u1)) * Math.cos(2.0 * Math.PI * u2);
+
+    // Scale to our desired mean and standard deviation
+    let value = mean + z0 * stdDev;
+
+    // Clamp to 0-100 range
+    value = Math.min(100, Math.max(0, value));
+
+    // Round to integer
+    traits[trait] = Math.round(value);
   }
 
   return traits;

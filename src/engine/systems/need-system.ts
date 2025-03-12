@@ -13,47 +13,75 @@ export class NeedSystem extends System {
   private tickCount: number = 0;
 
   public update(entities: Set<Entity>): void {
-    this.tickCount++;
-
     for (const entity of entities) {
       const components = this.ecs.getComponents(entity);
       const needsComponent = components.get(NeedsComponent);
 
-      // Store previous focus for comparison
-      const previousFocus = needsComponent.calculateFocus();
+      // Apply attribute effects to needs
+      if (components.has(AttributesComponent)) {
+        const attributesComponent = components.get(AttributesComponent);
 
-      // Update each need based on decay rate
-      for (const [needName, need] of needsComponent.needs.entries()) {
-        const oldValue = need.value;
+        // Process each need
+        for (const [needName, need] of needsComponent.needs.entries()) {
+          // Adjust decay rates based on attributes
+          let decayModifier = 1.0;
 
-        // Decay the need based on priority and decay rate
-        // Higher priority needs decay slower
-        const adjustedDecayRate =
-          need.decayRate * (1 - (need.priority - 1) * 0.05);
-        need.value = Math.max(-100000, need.value - adjustedDecayRate);
+          switch (need.category) {
+            case "Physical":
+              // Physical needs affected by physical attributes
+              const endurance = attributesComponent.getAttribute("ENDURANCE");
+              const toughness = attributesComponent.getAttribute("TOUGHNESS");
 
-        // If need crosses critical threshold, handle it
-        if (
-          oldValue >= this.needCriticalThreshold &&
-          need.value < this.needCriticalThreshold
-        ) {
-          this.handleCriticalNeed(entity, needName, need, components);
+              // Higher endurance/toughness = slower physical need decay
+              decayModifier -= ((endurance - 1000) / 1000) * 0.3;
+              decayModifier -= ((toughness - 1000) / 1000) * 0.2;
+              break;
+
+            case "Social":
+              // Social needs affected by social attributes
+              const socialAwareness =
+                attributesComponent.getAttribute("SOCIAL_AWARENESS");
+              const empathy = attributesComponent.getAttribute("EMPATHY");
+
+              // Higher social skills = slower social need decay
+              decayModifier -= ((socialAwareness - 1000) / 1000) * 0.3;
+              decayModifier -= ((empathy - 1000) / 1000) * 0.2;
+              break;
+
+            case "Mental":
+              // Mental needs affected by mental attributes
+              const willpower = attributesComponent.getAttribute("WILLPOWER");
+              const focus = attributesComponent.getAttribute("FOCUS");
+
+              // Higher mental attributes = slower mental need decay
+              decayModifier -= ((willpower - 1000) / 1000) * 0.3;
+              decayModifier -= ((focus - 1000) / 1000) * 0.2;
+              break;
+          }
+
+          // Ensure decay rate doesn't go too low
+          decayModifier = Math.max(0.2, decayModifier);
+
+          // Apply modified decay rate
+          const adjustedDecayRate = need.decayRate * decayModifier;
+          need.value = Math.max(-100000, need.value - adjustedDecayRate);
         }
 
-        // Create memories for need states periodically
-        this.createNeedMemories(entity, needName, need, components);
+        // Calculate focus - higher willpower and focus attributes improve focus level
+        const willpower = attributesComponent.getAttribute("WILLPOWER");
+        const focusAttr = attributesComponent.getAttribute("FOCUS");
+
+        // Apply focus attribute bonuses to focus calculations
+        const focusBonus =
+          ((willpower - 1000) / 1000) * 20 + ((focusAttr - 1000) / 1000) * 30;
+        needsComponent.focus = Math.min(
+          140,
+          needsComponent.calculateFocus() + focusBonus
+        );
+      } else {
+        // Default focus calculation if no attributes
+        needsComponent.focus = needsComponent.calculateFocus();
       }
-
-      // Calculate new focus after updates
-      const newFocus = needsComponent.calculateFocus();
-
-      // Apply focus effects if changed significantly
-      if (Math.abs(newFocus - previousFocus) >= 5) {
-        this.applyFocusEffects(entity, newFocus, previousFocus, components);
-      }
-
-      // Generate goals based on critical needs
-      this.generateNeedBasedGoals(entity, components);
     }
   }
 
